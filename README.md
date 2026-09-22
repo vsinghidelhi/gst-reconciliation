@@ -1,9 +1,22 @@
 # 📊 Automated 2-Way GST Reconciliation Engine (Portal 2B vs SAP Books)
 
 > **Developed for:** V. Singhi & Associates / `vsinghidelhi`  
+> **Live Web App Portal:** [**Open GST Reconciliation Portal**](https://script.google.com/macros/s/AKfycbwwuRkzaksb328BfIVxEeVjKfYSfxQtfeBKHP3L43kbLg9iG2JI4r2lWsXCej1U3z7uRA/exec)  
 > **Purpose:** 100% Automated Bi-Directional GST Reconciliation between GST Portal (GSTR-2B) and SAP Purchase Register (Books).
 
 ---
+
+## 🌐 Google Apps Script Live Frontend Web App
+
+In addition to the standalone Python CLI engine, a full-featured, responsive **Web App UI** is deployed on Google Apps Script:
+
+* **Live Web App URL:** [https://script.google.com/macros/s/AKfycbwwuRkzaksb328BfIVxEeVjKfYSfxQtfeBKHP3L43kbLg9iG2JI4r2lWsXCej1U3z7uRA/exec](https://script.google.com/macros/s/AKfycbwwuRkzaksb328BfIVxEeVjKfYSfxQtfeBKHP3L43kbLg9iG2JI4r2lWsXCej1U3z7uRA/exec)
+* **Features:**
+  * ⚡ **1-Click Demo:** Instant loading of Bangalore IOT sample dataset with real-time KPI metrics.
+  * 📁 **Upload Files:** Client-side parsing of raw SAP & Portal Excel spreadsheets.
+  * 📊 **Export to Google Drive:** Auto-generates a 5-tab styled Google Spreadsheet with one click.
+  * 📥 **CSV Downloads:** Export individual views (Vendor Pivot, Books vs Portal, Portal vs Books, Actionable List).
+  * 📋 **Vendor Follow-up Helper:** One-click copy email reminder templates for defaulting suppliers.
 
 ## 🎯 Core Concept & 2-Check Architecture
 
