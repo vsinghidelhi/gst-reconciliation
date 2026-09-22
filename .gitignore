@@ -1,0 +1,25 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Large data and excel files (keep repo clean)
+*.xlsx
+*.xls
+*.csv
+*.tsv
+
+# Logs
+*.log
+
+# OS generated
+Thumbs.db
+Desktop.ini
+.DS_Store
