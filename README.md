@@ -1,16 +1,16 @@
 # 📊 Automated 2-Way GST Reconciliation Engine (Portal 2B vs SAP Books)
 
 > **Developed for:** V. Singhi & Associates / `vsinghidelhi`  
-> **Live Web App Portal:** [**Open GST Reconciliation Portal**](https://script.google.com/macros/s/AKfycbyFDRGM5Cjwt2mChX778Ncmhvxv3JKqFAEehKO6YnaQJeC5rtESBWySwFhJmblynrNW/exec)  
+> **Live Web App Portal:** [**Open GST Reconciliation Portal**](https://script.google.com/macros/s/AKfycbzELXFI2iJwI6yOLyeAMjhiJGFz0Hj5SxC8vIl3HgP6t9Rh1H9ZxwSnq0BPK6RBxaK3/exec)  
 > **Purpose:** 100% Automated Bi-Directional GST Reconciliation between GST Portal (GSTR-2B) and SAP Purchase Register (Books).
 
 ---
 
 ## 🌐 Google Apps Script Live Frontend Web App
 
-In addition to the standalone Python CLI engine, a full-featured, responsive **Web App UI** is deployed on Google Apps Script:
+In addition to the standalone Python CLI engine, a full-featured, responsive **Web App UI** is deployed on Google Apps Script (Accessible to **Anyone** without login):
 
-* **Live Web App URL:** [https://script.google.com/macros/s/AKfycbyFDRGM5Cjwt2mChX778Ncmhvxv3JKqFAEehKO6YnaQJeC5rtESBWySwFhJmblynrNW/exec](https://script.google.com/macros/s/AKfycbyFDRGM5Cjwt2mChX778Ncmhvxv3JKqFAEehKO6YnaQJeC5rtESBWySwFhJmblynrNW/exec)
+* **Live Web App URL:** [https://script.google.com/macros/s/AKfycbzELXFI2iJwI6yOLyeAMjhiJGFz0Hj5SxC8vIl3HgP6t9Rh1H9ZxwSnq0BPK6RBxaK3/exec](https://script.google.com/macros/s/AKfycbzELXFI2iJwI6yOLyeAMjhiJGFz0Hj5SxC8vIl3HgP6t9Rh1H9ZxwSnq0BPK6RBxaK3/exec)
 * **Features:**
   * ⚡ **1-Click Demo:** Instant loading of Bangalore IOT sample dataset with real-time KPI metrics.
   * 📁 **Upload Files:** Client-side parsing of raw SAP & Portal Excel spreadsheets.
