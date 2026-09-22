@@ -85,6 +85,7 @@
     .card-kpi.border-danger { border-left-color: #DC3545 !important; }
     .card-kpi.border-orange { border-left-color: #FD7E14 !important; }
     .card-kpi.border-purple { border-left-color: #6F42C1 !important; }
+    .card-kpi.border-indigo { border-left-color: #512DA8 !important; }
 
     .nav-tabs .nav-link {
       color: #4A5568;
@@ -104,18 +105,19 @@
       background-color: var(--vsa-navy);
       color: #FFFFFF;
       font-weight: 600;
-      font-size: 0.82rem;
+      font-size: 0.80rem;
       vertical-align: middle;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
     .table td {
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       vertical-align: middle;
     }
 
     .badge-matched { background-color: #D4EDDA; color: #155724; font-weight: 600; }
     .badge-smart { background-color: #D1ECF1; color: #0C5460; font-weight: 600; }
+    .badge-head-mismatch { background-color: #E2D9F3; color: #512DA8; font-weight: 600; }
     .badge-mismatch { background-color: #FFF3CD; color: #856404; font-weight: 600; }
     .badge-missing-books { background-color: #F8D7DA; color: #721C24; font-weight: 600; }
     .badge-missing-portal { background-color: #FCE4D6; color: #C65911; font-weight: 600; }
@@ -150,12 +152,18 @@
       border-radius: 35px;
       box-shadow: 0 4px 14px rgba(40, 167, 69, 0.35);
       transition: all 0.25s ease-in-out;
-      font-size: 1rem;
     }
-    .btn-download-direct:hover {
+    .btn-download-direct:hover:not(:disabled) {
+      background: linear-gradient(135deg, #218838 0%, #19692C 100%);
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(40, 167, 69, 0.45);
+      box-shadow: 0 6px 18px rgba(40, 167, 69, 0.45);
       color: #FFFFFF;
+    }
+    .btn-download-direct:disabled {
+      background: #A0AEC0;
+      box-shadow: none;
+      cursor: not-allowed;
+      opacity: 0.7;
     }
 
     .btn-run-recon {
@@ -163,35 +171,56 @@
       color: #FFFFFF;
       border: none;
       font-weight: 700;
-      letter-spacing: 0.5px;
-      padding: 0.85rem 1.85rem;
+      padding: 0.85rem 1.8rem;
       border-radius: 35px;
-      box-shadow: 0 4px 14px rgba(31, 78, 121, 0.3);
-      transition: all 0.25s ease-in-out;
-      font-size: 1rem;
+      box-shadow: 0 4px 12px rgba(31, 78, 121, 0.3);
+      transition: all 0.25s ease;
     }
-    .btn-run-recon:hover {
+    .btn-run-recon:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--vsa-navy-dark) 0%, var(--vsa-navy) 100%);
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(31, 78, 121, 0.4);
+      box-shadow: 0 6px 16px rgba(31, 78, 121, 0.4);
       color: #FFFFFF;
     }
-
-    .success-download-banner {
-      background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
-      border: 2px solid #81C784;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
+    .btn-run-recon:disabled {
+      background: #CBD5E0;
+      box-shadow: none;
+      cursor: not-allowed;
+      opacity: 0.7;
     }
 
     .loading-overlay {
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.88);
-      z-index: 9999;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      z-index: 9999;
+    }
+
+    .success-download-banner {
+      background: linear-gradient(135deg, #EBFBEE 0%, #D3F9D8 100%);
+      border: 1px solid #B2F2BB;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+
+    .reason-text {
+      font-size: 0.78rem;
+      color: #4A5568;
+      max-width: 260px;
+      white-space: normal;
+      line-height: 1.25;
+    }
+    .heads-pill {
+      font-size: 0.75rem;
+      font-family: monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #F1F5F9;
+      display: inline-block;
     }
   </style>
 </head>
@@ -201,7 +230,7 @@
   <div id="loadingOverlay" class="loading-overlay d-none">
     <div class="spinner-border text-primary" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
     <h5 class="mt-3 text-dark fw-bold" id="loadingMsg">Processing Reconciliation...</h5>
-    <p class="text-muted small">Executing 2-Check matching engine across invoices & vendor GSTINs</p>
+    <p class="text-muted small">Executing 2-Check matching engine across IGST, CGST, SGST & vendor GSTINs</p>
   </div>
 
   <!-- Navbar -->
@@ -211,7 +240,7 @@
         <div class="bg-white text-dark rounded px-2 py-1 me-2 fw-bold" style="font-size: 0.9rem; letter-spacing: 0.5px;">VSA</div>
         <div>
           <span class="navbar-brand mb-0 h1 fw-bold fs-6">V. Singhi & Associates | GST 2-Way Reconciliation Engine</span>
-          <div class="text-white-50 small" style="font-size: 0.75rem;">Bi-Directional Auto-Reconciliation: GST Portal (GSTR-2B) vs SAP Purchase Register</div>
+          <div class="text-white-50 small" style="font-size: 0.75rem;">Independent 3-Way Tax Head Verification (IGST / CGST / SGST) & Explainable Smart Matching</div>
         </div>
       </div>
       <div class="d-flex align-items-center gap-2">
@@ -231,7 +260,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
           <div>
             <h5 class="fw-bold mb-1 text-dark"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Upload Files for 2-Way Reconciliation</h5>
-            <p class="text-muted small mb-0">Drag & drop your GST Portal file on the left, and SAP Purchase Register on the right. Reconciliation happens directly in your browser.</p>
+            <p class="text-muted small mb-0">Drag & drop your GST Portal file on the left, and SAP Purchase Register on the right. Reconciliation executes 100% directly inside your browser.</p>
           </div>
           <div class="d-flex gap-3 align-items-center mt-2 mt-md-0">
             <div>
@@ -305,12 +334,12 @@
           </div>
           <div>
             <h5 class="fw-bold text-dark mb-0">Reconciliation Completed Successfully!</h5>
-            <p class="text-muted small mb-0">Your 5-sheet comprehensive reconciliation report is ready to download to your computer.</p>
+            <p class="text-muted small mb-0">5-sheet detailed report with side-by-side invoice columns and 3-tax-head verification is ready.</p>
           </div>
         </div>
         <div>
           <button class="btn btn-success btn-lg fw-bold px-4 py-2 shadow-sm rounded-pill" onclick="downloadReconciledExcelDirect()">
-            <i class="bi bi-download me-2"></i> Download Excel (.xlsx) Directly Now
+            <i class="bi bi-download me-2"></i> Download Reconciled Excel (.xlsx) Now
           </button>
         </div>
       </div>
@@ -372,12 +401,12 @@
         </li>
         <li class="nav-item">
           <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabBooksVsPortal">
-            <i class="bi bi-arrow-right-circle me-1"></i> Check 2: Books vs Portal (View 1) <span class="badge bg-secondary ms-1" id="badgeBooksCount">0</span>
+            <i class="bi bi-arrow-right-circle me-1"></i> Check 2: Books vs Portal (Side-by-Side) <span class="badge bg-secondary ms-1" id="badgeBooksCount">0</span>
           </button>
         </li>
         <li class="nav-item">
           <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPortalVsBooks">
-            <i class="bi bi-arrow-left-circle me-1"></i> Check 2: Portal vs Books (View 2) <span class="badge bg-secondary ms-1" id="badgePortalCount">0</span>
+            <i class="bi bi-arrow-left-circle me-1"></i> Check 2: Portal vs Books (Side-by-Side) <span class="badge bg-secondary ms-1" id="badgePortalCount">0</span>
           </button>
         </li>
         <li class="nav-item">
@@ -400,6 +429,7 @@
             <div class="d-flex gap-1 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm filter-btn active" onclick="setVendorFilter('ALL', this)">All (<span id="cntVendAll">0</span>)</button>
               <button class="btn btn-outline-success btn-sm filter-btn" onclick="setVendorFilter('100% Matched', this)">100% Matched (<span id="cntVendMatched">0</span>)</button>
+              <button class="btn btn-outline-info btn-sm filter-btn" onclick="setVendorFilter('Tax Head Mismatch', this)">Head Mismatch (<span id="cntVendHeadMismatch">0</span>)</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setVendorFilter('Tax Variance', this)">Tax Variance (<span id="cntVendVariance">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setVendorFilter('Only in Books', this)">Only in Books (<span id="cntVendOnlyBooks">0</span>)</button>
               <button class="btn btn-outline-dark btn-sm filter-btn" onclick="setVendorFilter('Only in Portal', this)">Only in Portal (<span id="cntVendOnlyPortal">0</span>)</button>
@@ -414,19 +444,21 @@
                   <th>Status</th>
                   <th class="text-end">Books Tax (₹)</th>
                   <th class="text-end">Portal Tax (₹)</th>
-                  <th class="text-end">Tax Variance (₹)</th>
+                  <th class="text-end">Variance (₹)</th>
+                  <th>Books Heads (I / C / S)</th>
+                  <th>Portal Heads (I / C / S)</th>
                   <th class="text-center">Books Bills</th>
                   <th class="text-center">Portal Bills</th>
                 </tr>
               </thead>
               <tbody id="vendorTableBody">
-                <tr><td colspan="8" class="text-center py-4 text-muted">No data loaded.</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">No data loaded.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- TAB 2: Check 2 - Books vs Portal (View 1) -->
+        <!-- TAB 2: Check 2 - Books vs Portal (Side-by-Side) -->
         <div class="tab-pane fade" id="tabBooksVsPortal">
           <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <div class="position-relative" style="width: 320px;">
@@ -436,6 +468,7 @@
             <div class="d-flex gap-1 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm filter-btn active" onclick="setBooksFilter('ALL', this)">All (<span id="cntBvPAll">0</span>)</button>
               <button class="btn btn-outline-success btn-sm filter-btn" onclick="setBooksFilter('Matched', this)">Matched (<span id="cntBvPMatched">0</span>)</button>
+              <button class="btn btn-outline-info btn-sm filter-btn" onclick="setBooksFilter('Head Mismatch', this)">Head Mismatch (<span id="cntBvPHeadMismatch">0</span>)</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setBooksFilter('Value Mismatch', this)">Value Mismatch (<span id="cntBvPMismatch">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setBooksFilter('Only in Books', this)">Only in Books (<span id="cntBvPMissing">0</span>)</button>
             </div>
@@ -444,26 +477,29 @@
             <table class="table table-hover table-bordered mb-0">
               <thead>
                 <tr>
-                  <th>SAP Trans No</th>
-                  <th>Date</th>
-                  <th>Vendor Bill No</th>
-                  <th>Vendor Name</th>
-                  <th>Vendor GSTIN</th>
-                  <th class="text-end">Books Tax (₹)</th>
+                  <th>Books Bill No</th>
                   <th>Portal Doc No</th>
+                  <th>Match Status</th>
+                  <th>Match Reason / Typo Basis</th>
+                  <th>Books Date</th>
+                  <th>Portal Date</th>
+                  <th class="text-end">Books Tax (₹)</th>
                   <th class="text-end">Portal Tax (₹)</th>
-                  <th class="text-end">Difference (₹)</th>
-                  <th>Reconciliation Status</th>
+                  <th class="text-end">Diff (₹)</th>
+                  <th>Books Heads (I / C / S)</th>
+                  <th>Portal Heads (I / C / S)</th>
+                  <th>Vendor Name</th>
+                  <th>Supplier GSTIN</th>
                 </tr>
               </thead>
               <tbody id="booksTableBody">
-                <tr><td colspan="10" class="text-center py-4 text-muted">No data loaded.</td></tr>
+                <tr><td colspan="13" class="text-center py-4 text-muted">No data loaded.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- TAB 3: Check 2 - Portal vs Books (View 2) -->
+        <!-- TAB 3: Check 2 - Portal vs Books (Side-by-Side) -->
         <div class="tab-pane fade" id="tabPortalVsBooks">
           <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <div class="position-relative" style="width: 320px;">
@@ -473,6 +509,7 @@
             <div class="d-flex gap-1 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm filter-btn active" onclick="setPortalFilter('ALL', this)">All (<span id="cntPvBAll">0</span>)</button>
               <button class="btn btn-outline-success btn-sm filter-btn" onclick="setPortalFilter('Matched', this)">Matched (<span id="cntPvBMatched">0</span>)</button>
+              <button class="btn btn-outline-info btn-sm filter-btn" onclick="setPortalFilter('Head Mismatch', this)">Head Mismatch (<span id="cntPvBHeadMismatch">0</span>)</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setPortalFilter('Value Mismatch', this)">Value Mismatch (<span id="cntPvBMismatch">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setPortalFilter('Only in Portal', this)">Unbooked in SAP (<span id="cntPvBUnbooked">0</span>)</button>
             </div>
@@ -481,19 +518,23 @@
             <table class="table table-hover table-bordered mb-0">
               <thead>
                 <tr>
-                  <th>Supplier GSTIN</th>
-                  <th>Supplier Name</th>
                   <th>Portal Doc No</th>
-                  <th>Doc Date</th>
+                  <th>Books Bill No</th>
+                  <th>Match Status</th>
+                  <th>Match Reason / Typo Basis</th>
+                  <th>Portal Date</th>
+                  <th>Books Date</th>
                   <th class="text-end">Portal Tax (₹)</th>
-                  <th>Matched Books Bill</th>
                   <th class="text-end">Books Tax (₹)</th>
-                  <th class="text-end">Difference (₹)</th>
-                  <th>Booking / Match Status</th>
+                  <th class="text-end">Diff (₹)</th>
+                  <th>Portal Heads (I / C / S)</th>
+                  <th>Books Heads (I / C / S)</th>
+                  <th>Supplier Name</th>
+                  <th>Supplier GSTIN</th>
                 </tr>
               </thead>
               <tbody id="portalTableBody">
-                <tr><td colspan="9" class="text-center py-4 text-muted">No data loaded.</td></tr>
+                <tr><td colspan="13" class="text-center py-4 text-muted">No data loaded.</td></tr>
               </tbody>
             </table>
           </div>
@@ -509,6 +550,7 @@
             <div class="d-flex gap-1 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm filter-btn active" onclick="setActionFilter('ALL', this)">All Discrepancies</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setActionFilter('Missing in 2B', this)">Vendor Follow-up</button>
+              <button class="btn btn-outline-info btn-sm filter-btn" onclick="setActionFilter('Head Mismatch', this)">Head POS Correction</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setActionFilter('Value Discrepancy', this)">Value Variance</button>
               <button class="btn btn-outline-dark btn-sm filter-btn" onclick="setActionFilter('Booking Pending', this)">Pending SAP Booking</button>
             </div>
@@ -520,16 +562,18 @@
                   <th>Category</th>
                   <th>Supplier GSTIN</th>
                   <th>Party Name</th>
-                  <th>Invoice / Doc No</th>
+                  <th>Books Bill No</th>
+                  <th>Portal Doc No</th>
                   <th>Date</th>
                   <th class="text-end">Taxable (₹)</th>
                   <th class="text-end">Total Tax (₹)</th>
-                  <th>Recommended Action</th>
+                  <th>Tax Heads Breakup</th>
+                  <th>Audit Impact / Action</th>
                   <th class="text-center">Action</th>
                 </tr>
               </thead>
               <tbody id="actionTableBody">
-                <tr><td colspan="9" class="text-center py-4 text-muted">No actionable discrepancies found.</td></tr>
+                <tr><td colspan="11" class="text-center py-4 text-muted">No actionable discrepancies found.</td></tr>
               </tbody>
             </table>
           </div>
@@ -613,7 +657,6 @@
           rawPortalRows = parsePortalRows(jsonRows);
           hideLoading();
 
-          // Update UI
           document.getElementById('portalDropBox').classList.add('has-file');
           document.getElementById('portalFileInfo').classList.remove('d-none');
           document.getElementById('portalFileName').innerText = file.name;
@@ -657,6 +700,7 @@
           gstin: gstin,
           supplier_name: String(r[colMap.name] || r['Supplier Name'] || 'Vendor').trim(),
           doc_no: doc_no,
+          clean_doc_no: cleanInvoiceNo(doc_no),
           doc_date: String(r[colMap.date] || r['Doc Date'] || r['Invoice Date'] || '').slice(0, 10),
           taxable: taxable,
           igst: igst,
@@ -687,10 +731,8 @@
           rawBooksRows = parseBooksRows(jsonRows);
           hideLoading();
 
-          // Auto-populate branch dropdown
           populateBranchDropdown(rawBooksRows);
 
-          // Update UI
           document.getElementById('booksDropBox').classList.add('has-file');
           document.getElementById('booksFileInfo').classList.remove('d-none');
           document.getElementById('booksFileName').innerText = file.name;
@@ -737,6 +779,7 @@
           sap_trans_no: String(r[colMap.trans_no] || r['SAP Trans No'] || r['Transaction Number'] || '').trim(),
           inv_date: String(r[colMap.date] || r['Invoice Date'] || '').slice(0, 10),
           bill_no: bill_no,
+          clean_bill_no: cleanInvoiceNo(bill_no),
           vendor_name: String(r[colMap.name] || r['Vendor Name'] || 'Vendor').trim(),
           gstin: gstin,
           taxable: taxable,
@@ -801,20 +844,17 @@
       const tol = parseFloat(document.getElementById('numTolerance').value) || 2.0;
       showLoading(`Executing 2-Check Matching Engine (${selectedBranch})...`);
 
-      // Run directly in-browser for instant zero-latency speed
       setTimeout(() => {
         const res = clientSideEngine(filteredBooks, rawPortalRows, tol);
         hideLoading();
         currentReconData = res;
         renderReconciliation(res);
 
-        // Show KPI, Results, and Prominent Download Banner
         document.getElementById('kpiRow').classList.remove('d-none');
         document.getElementById('resultsSection').classList.remove('d-none');
         document.getElementById('downloadBanner').classList.remove('d-none');
         document.getElementById('btnDownloadOutputExcel').disabled = false;
 
-        // Smooth scroll to download banner
         document.getElementById('downloadBanner').scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
@@ -828,8 +868,8 @@
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function(sampleData) {
-            rawBooksRows = sampleData.books;
-            rawPortalRows = sampleData.portal;
+            rawBooksRows = sampleData.books.map(b => ({ ...b, clean_bill_no: cleanInvoiceNo(b.bill_no) }));
+            rawPortalRows = sampleData.portal.map(p => ({ ...p, clean_doc_no: cleanInvoiceNo(p.doc_no) }));
 
             document.getElementById('portalDropBox').classList.add('has-file');
             document.getElementById('portalFileInfo').classList.remove('d-none');
@@ -855,40 +895,158 @@
     }
 
     // -------------------------------------------------------------
-    // CLIENT-SIDE ENGINE (CHECK 1 & CHECK 2 MATCHING LOGIC)
+    // CLIENT-SIDE MATCHING ENGINE (CHECK 1 & CHECK 2)
     // -------------------------------------------------------------
+    function getLevenshteinDistance(s1, s2) {
+      if (s1.length < s2.length) return getLevenshteinDistance(s2, s1);
+      if (s2.length === 0) return s1.length;
+      let prev = [];
+      for (let i = 0; i <= s2.length; i++) prev[i] = i;
+      for (let i = 0; i < s1.length; i++) {
+        let curr = [i + 1];
+        for (let j = 0; j < s2.length; j++) {
+          let ins = prev[j + 1] + 1;
+          let dels = curr[j] + 1;
+          let subs = prev[j] + (s1[i] !== s2[j] ? 1 : 0);
+          curr.push(Math.min(ins, dels, subs));
+        }
+        prev = curr;
+      }
+      return prev[prev.length - 1];
+    }
+
+    function diagnoseSmartMatch(bBill, pDoc, bClean, pClean, bDate, pDate) {
+      if (!bClean || !pClean) return { match: false, reason: "" };
+      if (bBill.includes(',') || bBill.includes(';')) return { match: false, reason: "" };
+
+      if (bClean === pClean) {
+        return { match: true, reason: "Normalized: FY format (2025-26 -> 25-26) / leading zeros / separators" };
+      }
+
+      // 1-char typo (e.g. 0048 vs 004B)
+      if (bClean.length === pClean.length && bClean.length >= 2) {
+        let diffCount = 0;
+        let c1 = '', c2 = '';
+        for (let i = 0; i < bClean.length; i++) {
+          if (bClean[i] !== pClean[i]) {
+            diffCount++;
+            c1 = bClean[i];
+            c2 = pClean[i];
+          }
+        }
+        if (diffCount === 1) {
+          return { match: true, reason: `1-Char Typo: '${bBill}' vs '${pDoc}' (Char '${c1}' vs '${c2}')` };
+        }
+      }
+
+      // Levenshtein edit distance = 1
+      if (Math.abs(bClean.length - pClean.length) <= 1 && bClean.length >= 3 && pClean.length >= 3) {
+        if (getLevenshteinDistance(bClean, pClean) === 1) {
+          return { match: true, reason: `1-Char Edit: '${bBill}' vs '${pDoc}'` };
+        }
+      }
+
+      // Prefix omission (e.g. 079 vs PSB-079)
+      if (bClean.length >= 2 && pClean.length >= 4) {
+        let bNum = bClean.replace(/^0+/, '');
+        let pNum = pClean.replace(/^[A-Z]+/, '').replace(/^0+/, '');
+        if (bNum && pNum && bNum === pNum) {
+          let pfx = (pClean.match(/^[A-Z]+/) || [''])[0];
+          return { match: true, reason: `Prefix Omitted in Books: '${pfx}' ('${bBill}' vs '${pDoc}')` };
+        }
+        if (pClean.endsWith(bClean)) {
+          let omitted = pClean.slice(0, pClean.length - bClean.length);
+          return { match: true, reason: `Prefix Omitted in Books: '${omitted}' ('${bBill}' vs '${pDoc}')` };
+        }
+      }
+
+      // Known Abbreviation (e.g. TechBOT vs TB)
+      if (bClean.length >= 6 && pClean.length >= 6 && bClean.slice(0, 4) === pClean.slice(0, 4) && bClean.slice(-4) === pClean.slice(-4)) {
+        return { match: true, reason: `Abbreviation Match: '${bBill}' vs '${pDoc}'` };
+      }
+
+      // Double-paste correction in Books
+      if (bClean.length >= 8 && pClean.length >= 6 && bClean.includes(pClean)) {
+        return { match: true, reason: `Double-paste in Books corrected: '${bBill}' vs '${pDoc}'` };
+      }
+
+      // Date entered in Doc No
+      let cleanPNums = pDoc.replace(/[^0-9]/g, '');
+      if (cleanPNums.length >= 6 && bDate) {
+        let cleanBDate = bDate.replace(/[^0-9]/g, '');
+        if (cleanPNums.includes(cleanBDate) || cleanBDate.includes(cleanPNums)) {
+          return { match: true, reason: `Date entered in Doc No: '${pDoc}'` };
+        }
+      }
+
+      return { match: false, reason: "" };
+    }
+
     function clientSideEngine(booksRows, portalRows, tolerance) {
-      // Check 1: Vendor Pivot
+      // -------------------------------------------------------------
+      // CHECK 1: VENDOR PIVOT (Tracking IGST, CGST, SGST)
+      // -------------------------------------------------------------
       const booksVendorAgg = {}, portalVendorAgg = {};
       booksRows.forEach(b => {
         const g = cleanGstin(b.gstin);
         if (!g) return;
-        if (!booksVendorAgg[g]) booksVendorAgg[g] = { name: b.vendor_name || '', count: 0, taxable: 0, total_tax: 0 };
+        if (!booksVendorAgg[g]) {
+          booksVendorAgg[g] = { name: b.vendor_name || '', count: 0, taxable: 0, total_tax: 0, igst: 0, cgst: 0, sgst: 0 };
+        }
         booksVendorAgg[g].count++;
         booksVendorAgg[g].taxable += safeFloat(b.taxable);
         booksVendorAgg[g].total_tax += safeFloat(b.total_tax);
+        booksVendorAgg[g].igst += safeFloat(b.igst);
+        booksVendorAgg[g].cgst += safeFloat(b.cgst);
+        booksVendorAgg[g].sgst += safeFloat(b.sgst);
       });
 
       portalRows.forEach(p => {
         const g = cleanGstin(p.gstin);
         if (!g) return;
-        if (!portalVendorAgg[g]) portalVendorAgg[g] = { name: p.supplier_name || '', count: 0, taxable: 0, total_tax: 0 };
+        if (!portalVendorAgg[g]) {
+          portalVendorAgg[g] = { name: p.supplier_name || '', count: 0, taxable: 0, total_tax: 0, igst: 0, cgst: 0, sgst: 0 };
+        }
         portalVendorAgg[g].count++;
         portalVendorAgg[g].taxable += safeFloat(p.taxable);
         portalVendorAgg[g].total_tax += safeFloat(p.total_tax);
+        portalVendorAgg[g].igst += safeFloat(p.igst);
+        portalVendorAgg[g].cgst += safeFloat(p.cgst);
+        portalVendorAgg[g].sgst += safeFloat(p.sgst);
       });
 
       const allGstins = Array.from(new Set([...Object.keys(booksVendorAgg), ...Object.keys(portalVendorAgg)])).sort();
       const vendorSummary = allGstins.map(g => {
-        const b = booksVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0 };
-        const p = portalVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0 };
+        const b = booksVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0, igst: 0, cgst: 0, sgst: 0 };
+        const p = portalVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0, igst: 0, cgst: 0, sgst: 0 };
+
         const bTax = Math.round(b.total_tax * 100) / 100;
         const pTax = Math.round(p.total_tax * 100) / 100;
         const diff = Math.round((bTax - pTax) * 100) / 100;
+
+        const bIgst = Math.round(b.igst * 100) / 100, pIgst = Math.round(p.igst * 100) / 100;
+        const bCgst = Math.round(b.cgst * 100) / 100, pCgst = Math.round(p.cgst * 100) / 100;
+        const bSgst = Math.round(b.sgst * 100) / 100, pSgst = Math.round(p.sgst * 100) / 100;
+
+        const igstDiff = Math.round((bIgst - pIgst) * 100) / 100;
+        const cgstDiff = Math.round((bCgst - pCgst) * 100) / 100;
+        const sgstDiff = Math.round((bSgst - pSgst) * 100) / 100;
+
+        const maxCount = Math.max(b.count, p.count);
+        const dynamicTol = Math.max(tolerance, Math.round(maxCount * 0.75 * 100) / 100);
+
         let st = '';
-        if (booksVendorAgg[g] && portalVendorAgg[g]) st = Math.abs(diff) <= tolerance ? '100% Matched' : 'Tax Variance';
-        else if (booksVendorAgg[g]) st = 'Only in Books';
-        else st = 'Only in Portal';
+        if (booksVendorAgg[g] && portalVendorAgg[g]) {
+          const headsMatch = (Math.abs(igstDiff) <= dynamicTol && Math.abs(cgstDiff) <= dynamicTol && Math.abs(sgstDiff) <= dynamicTol);
+          if (Math.abs(diff) <= tolerance && headsMatch) st = '100% Matched';
+          else if (Math.abs(diff) <= dynamicTol && headsMatch) st = '100% Matched (Round-off)';
+          else if (Math.abs(diff) <= dynamicTol && !headsMatch) st = 'Tax Head Mismatch (IGST vs CGST/SGST)';
+          else st = 'Tax Variance';
+        } else if (booksVendorAgg[g]) {
+          st = 'Only in Books';
+        } else {
+          st = 'Only in Portal';
+        }
 
         return {
           gstin: g,
@@ -897,6 +1055,15 @@
           books_tax: bTax,
           portal_tax: pTax,
           tax_variance: diff,
+          books_igst: bIgst,
+          portal_igst: pIgst,
+          igst_diff: igstDiff,
+          books_cgst: bCgst,
+          portal_cgst: pCgst,
+          cgst_diff: cgstDiff,
+          books_sgst: bSgst,
+          portal_sgst: pSgst,
+          sgst_diff: sgstDiff,
           books_taxable: Math.round(b.taxable * 100) / 100,
           portal_taxable: Math.round(p.taxable * 100) / 100,
           taxable_variance: Math.round((b.taxable - p.taxable) * 100) / 100,
@@ -905,59 +1072,136 @@
         };
       });
 
-      // Check 2: Multi-line invoice aggregation & matching
+      // -------------------------------------------------------------
+      // CHECK 2: INVOICE & TAX HEAD MICRO RECONCILIATION
+      // -------------------------------------------------------------
       const booksByKey = {};
       booksRows.forEach((b, i) => {
-        const key = cleanGstin(b.gstin) + '||' + cleanInvoiceNo(b.bill_no);
-        if (!booksByKey[key]) booksByKey[key] = { gstin: cleanGstin(b.gstin), bill_no: b.bill_no, clean_bill: cleanInvoiceNo(b.bill_no), name: b.vendor_name, taxable: 0, total_tax: 0, rows: [] };
+        const cInv = cleanInvoiceNo(b.bill_no);
+        const key = cleanGstin(b.gstin) + '||' + cInv;
+        if (!booksByKey[key]) {
+          booksByKey[key] = {
+            gstin: cleanGstin(b.gstin),
+            bill_no: b.bill_no,
+            clean_bill: cInv,
+            inv_date: b.inv_date,
+            name: b.vendor_name,
+            taxable: 0,
+            total_tax: 0,
+            igst: 0,
+            cgst: 0,
+            sgst: 0,
+            rows: []
+          };
+        }
         booksByKey[key].taxable += safeFloat(b.taxable);
         booksByKey[key].total_tax += safeFloat(b.total_tax);
+        booksByKey[key].igst += safeFloat(b.igst);
+        booksByKey[key].cgst += safeFloat(b.cgst);
+        booksByKey[key].sgst += safeFloat(b.sgst);
         booksByKey[key].rows.push(i);
       });
 
       const portalByKey = {}, portalByGstin = {};
       portalRows.forEach((p, j) => {
-        const key = cleanGstin(p.gstin) + '||' + cleanInvoiceNo(p.doc_no);
+        const cDoc = cleanInvoiceNo(p.doc_no);
+        const key = cleanGstin(p.gstin) + '||' + cDoc;
         portalByKey[key] = j;
         if (!portalByGstin[cleanGstin(p.gstin)]) portalByGstin[cleanGstin(p.gstin)] = [];
         portalByGstin[cleanGstin(p.gstin)].push(j);
       });
 
       const matchedBooksKeys = {}, matchedPortalIndices = new Set();
-      // Pass 1: Exact
+
+      // Pass 1: Exact Key Match
       Object.keys(booksByKey).forEach(key => {
         if (portalByKey.hasOwnProperty(key)) {
           const pIdx = portalByKey[key];
-          const diff = Math.abs(booksByKey[key].total_tax - safeFloat(portalRows[pIdx].total_tax));
-          matchedBooksKeys[key] = { pIdx: pIdx, status: diff <= tolerance ? 'Matched (Exact)' : 'Value Mismatch' };
+          const p = portalRows[pIdx];
+          const b = booksByKey[key];
+
+          const diffTot = Math.round(Math.abs(b.total_tax - safeFloat(p.total_tax)) * 100) / 100;
+          const diffIgst = Math.round(Math.abs(b.igst - safeFloat(p.igst)) * 100) / 100;
+          const diffCgst = Math.round(Math.abs(b.cgst - safeFloat(p.cgst)) * 100) / 100;
+          const diffSgst = Math.round(Math.abs(b.sgst - safeFloat(p.sgst)) * 100) / 100;
+
+          let st = '', rsn = '';
+          if (diffTot <= tolerance) {
+            if (diffIgst <= tolerance && diffCgst <= tolerance && diffSgst <= tolerance) {
+              st = 'Matched (Exact)';
+              rsn = 'Exact Match: Invoice No & All Tax Heads (IGST/CGST/SGST)';
+            } else {
+              st = 'Tax Head Mismatch (IGST vs CGST/SGST)';
+              rsn = `Total Tax matches, but Head Mismatch: Books(I:${b.igst}, C:${b.cgst}, S:${b.sgst}) vs Portal(I:${p.igst}, C:${p.cgst}, S:${p.sgst})`;
+            }
+          } else {
+            st = 'Value Mismatch';
+            rsn = `Invoice matches, but Tax difference is ₹${diffTot.toFixed(2)}`;
+          }
+
+          matchedBooksKeys[key] = { pIdx: pIdx, status: st, reason: rsn };
           matchedPortalIndices.add(pIdx);
         }
       });
 
-      // Pass 2: Smart / Typo
+      // Pass 2: Explainable Smart / Typo Match
       Object.keys(booksByKey).forEach(key => {
         if (matchedBooksKeys[key]) return;
         const b = booksByKey[key];
         const cand = portalByGstin[b.gstin] || [];
+
+        let bestPIdx = -1, bestStatus = '', bestReason = '';
+
         for (let pIdx of cand) {
           if (matchedPortalIndices.has(pIdx)) continue;
           const p = portalRows[pIdx];
-          const diff = Math.abs(b.total_tax - safeFloat(p.total_tax));
-          if (diff <= tolerance) {
-            const pDoc = cleanInvoiceNo(p.doc_no);
-            if (pDoc.includes(b.clean_bill) || b.clean_bill.includes(pDoc) || (b.clean_bill.length >= 4 && pDoc.slice(-4) === b.clean_bill.slice(-4))) {
-              matchedBooksKeys[key] = { pIdx: pIdx, status: 'Matched (Smart/Typo)' };
-              matchedPortalIndices.add(pIdx);
+
+          const diffTot = Math.round(Math.abs(b.total_tax - safeFloat(p.total_tax)) * 100) / 100;
+          const diffIgst = Math.round(Math.abs(b.igst - safeFloat(p.igst)) * 100) / 100;
+          const diffCgst = Math.round(Math.abs(b.cgst - safeFloat(p.cgst)) * 100) / 100;
+          const diffSgst = Math.round(Math.abs(b.sgst - safeFloat(p.sgst)) * 100) / 100;
+
+          if (diffTot <= tolerance) {
+            const diag = diagnoseSmartMatch(b.bill_no, p.doc_no, b.clean_bill, cleanInvoiceNo(p.doc_no), b.inv_date, p.doc_date);
+            let isMatch = diag.match;
+            let reason = diag.reason;
+
+            if (!isMatch && (!b.clean_bill || b.clean_bill === "0")) {
+              const sameTaxCount = cand.filter(pi => Math.abs(safeFloat(portalRows[pi].total_tax) - b.total_tax) <= tolerance).length;
+              if (sameTaxCount === 1) {
+                isMatch = true;
+                reason = `Blank Bill No in Books: Unique bill for vendor ${b.name}`;
+              }
+            }
+
+            if (isMatch) {
+              if (diffIgst <= tolerance && diffCgst <= tolerance && diffSgst <= tolerance) {
+                bestStatus = 'Matched (Smart/Typo)';
+              } else {
+                bestStatus = 'Tax Head Mismatch (IGST vs CGST/SGST)';
+                reason += ` | Head Mismatch: Books(I:${b.igst}, C:${b.cgst}, S:${b.sgst}) vs Portal(I:${p.igst}, C:${p.cgst}, S:${p.sgst})`;
+              }
+              bestPIdx = pIdx;
+              bestReason = reason;
               break;
             }
           }
         }
+
+        if (bestPIdx !== -1) {
+          matchedBooksKeys[key] = { pIdx: bestPIdx, status: bestStatus, reason: bestReason };
+          matchedPortalIndices.add(bestPIdx);
+        }
       });
 
-      // Build Views
+      // -------------------------------------------------------------
+      // BUILD DETAILED VIEWS (SIDE-BY-SIDE PRESENTATION)
+      // -------------------------------------------------------------
       const booksVsPortal = [], actionableList = [];
       booksRows.forEach(b => {
         const key = cleanGstin(b.gstin) + '||' + cleanInvoiceNo(b.bill_no);
+        const bAgg = booksByKey[key] || b;
+
         const row = {
           branch: b.branch || '',
           sap_trans_no: b.sap_trans_no || '',
@@ -966,20 +1210,43 @@
           vendor_name: b.vendor_name || '',
           gstin: cleanGstin(b.gstin),
           taxable: safeFloat(b.taxable),
+          igst: safeFloat(b.igst),
+          cgst: safeFloat(b.cgst),
+          sgst: safeFloat(b.sgst),
           total_tax: safeFloat(b.total_tax),
           portal_doc_no: '-',
+          portal_doc_date: '-',
+          portal_taxable: 0,
+          taxable_diff: safeFloat(b.taxable),
+          portal_igst: 0,
+          igst_diff: safeFloat(b.igst),
+          portal_cgst: 0,
+          cgst_diff: safeFloat(b.cgst),
+          portal_sgst: 0,
+          sgst_diff: safeFloat(b.sgst),
           portal_tax: 0,
           tax_diff: safeFloat(b.total_tax),
-          match_status: 'Only in Books (Missing in 2B)'
+          match_status: 'Only in Books (Missing in 2B)',
+          match_reason: 'Vendor has not filed invoice in GSTR-1 or GSTIN mismatch'
         };
 
         if (matchedBooksKeys[key]) {
           const m = matchedBooksKeys[key];
           const p = portalRows[m.pIdx];
           row.portal_doc_no = p.doc_no;
+          row.portal_doc_date = p.doc_date;
+          row.portal_taxable = safeFloat(p.taxable);
+          row.taxable_diff = Math.round((safeFloat(b.taxable) - safeFloat(p.taxable)) * 100) / 100;
+          row.portal_igst = safeFloat(p.igst);
+          row.igst_diff = Math.round((safeFloat(b.igst) - safeFloat(p.igst)) * 100) / 100;
+          row.portal_cgst = safeFloat(p.cgst);
+          row.cgst_diff = Math.round((safeFloat(b.cgst) - safeFloat(p.cgst)) * 100) / 100;
+          row.portal_sgst = safeFloat(p.sgst);
+          row.sgst_diff = Math.round((safeFloat(b.sgst) - safeFloat(p.sgst)) * 100) / 100;
           row.portal_tax = safeFloat(p.total_tax);
-          row.tax_diff = Math.round((booksByKey[key].total_tax - safeFloat(p.total_tax)) * 100) / 100;
+          row.tax_diff = Math.round((bAgg.total_tax - safeFloat(p.total_tax)) * 100) / 100;
           row.match_status = m.status;
+          row.match_reason = m.reason;
         }
         booksVsPortal.push(row);
 
@@ -988,23 +1255,38 @@
             action_type: 'Vendor Follow-up (Missing in 2B)',
             gstin: row.gstin,
             party_name: row.vendor_name,
-            invoice_no: row.bill_no,
+            books_bill_no: row.bill_no,
+            portal_doc_no: '-',
             invoice_date: row.inv_date,
             taxable: row.taxable,
             total_tax: row.total_tax,
-            variance: row.total_tax,
+            heads_breakup: `Books(I:${row.igst}, C:${row.cgst}, S:${row.sgst}) | Portal(-)`,
             recommended_action: 'Send follow-up email/reminder to Vendor with Bill details'
+          });
+        } else if (row.match_status.includes('Head Mismatch')) {
+          actionableList.push({
+            action_type: 'Tax Head POS Correction',
+            gstin: row.gstin,
+            party_name: row.vendor_name,
+            books_bill_no: row.bill_no,
+            portal_doc_no: row.portal_doc_no,
+            invoice_date: row.inv_date,
+            taxable: row.taxable,
+            total_tax: row.total_tax,
+            heads_breakup: `Books(I:${row.igst}, C:${row.cgst}, S:${row.sgst}) vs Portal(I:${row.portal_igst}, C:${row.portal_cgst}, S:${row.portal_sgst})`,
+            recommended_action: 'Reclassify entry in SAP: Intra-state vs Inter-state tax heads'
           });
         } else if (row.match_status === 'Value Mismatch') {
           actionableList.push({
             action_type: 'Value Discrepancy Investigation',
             gstin: row.gstin,
             party_name: row.vendor_name,
-            invoice_no: row.bill_no,
+            books_bill_no: row.bill_no,
+            portal_doc_no: row.portal_doc_no,
             invoice_date: row.inv_date,
             taxable: row.taxable,
             total_tax: row.total_tax,
-            variance: row.tax_diff,
+            heads_breakup: `Books: ₹${row.total_tax} vs Portal: ₹${row.portal_tax}`,
             recommended_action: 'Check tax rate/partial booking (Portal Tax: ₹' + row.portal_tax + ')'
           });
         }
@@ -1012,7 +1294,7 @@
 
       const portalToBooks = {};
       Object.keys(matchedBooksKeys).forEach(k => {
-        portalToBooks[matchedBooksKeys[k].pIdx] = { key: k, status: matchedBooksKeys[k].status };
+        portalToBooks[matchedBooksKeys[k].pIdx] = { key: k, status: matchedBooksKeys[k].status, reason: matchedBooksKeys[k].reason };
       });
 
       const portalVsBooks = [];
@@ -1023,19 +1305,43 @@
           doc_no: p.doc_no || '',
           doc_date: p.doc_date || '',
           taxable: safeFloat(p.taxable),
+          igst: safeFloat(p.igst),
+          cgst: safeFloat(p.cgst),
+          sgst: safeFloat(p.sgst),
           total_tax: safeFloat(p.total_tax),
           books_bill_no: '-',
+          books_inv_date: '-',
+          books_taxable: 0,
+          taxable_diff: safeFloat(p.taxable),
+          books_igst: 0,
+          igst_diff: safeFloat(p.igst),
+          books_cgst: 0,
+          cgst_diff: safeFloat(p.cgst),
+          books_sgst: 0,
+          sgst_diff: safeFloat(p.sgst),
           books_tax: 0,
           tax_diff: safeFloat(p.total_tax),
-          match_status: 'Only in Portal (Unbooked)'
+          match_status: 'Only in Portal (Unbooked)',
+          match_reason: 'Bill available in 2B but not recorded in SAP Books'
         };
+
         if (portalToBooks[j]) {
-          const k = portalToBooks[j].key;
-          const b = booksByKey[k];
+          const m = portalToBooks[j];
+          const b = booksByKey[m.key];
           row.books_bill_no = b.bill_no;
+          row.books_inv_date = b.inv_date;
+          row.books_taxable = Math.round(b.taxable * 100) / 100;
+          row.taxable_diff = Math.round((safeFloat(p.taxable) - b.taxable) * 100) / 100;
+          row.books_igst = Math.round(b.igst * 100) / 100;
+          row.igst_diff = Math.round((safeFloat(p.igst) - b.igst) * 100) / 100;
+          row.books_cgst = Math.round(b.cgst * 100) / 100;
+          row.cgst_diff = Math.round((safeFloat(p.cgst) - b.cgst) * 100) / 100;
+          row.books_sgst = Math.round(b.sgst * 100) / 100;
+          row.sgst_diff = Math.round((safeFloat(p.sgst) - b.sgst) * 100) / 100;
           row.books_tax = Math.round(b.total_tax * 100) / 100;
           row.tax_diff = Math.round((safeFloat(p.total_tax) - b.total_tax) * 100) / 100;
-          row.match_status = portalToBooks[j].status;
+          row.match_status = m.status;
+          row.match_reason = m.reason;
         }
         portalVsBooks.push(row);
 
@@ -1044,11 +1350,12 @@
             action_type: 'Accounting Booking Pending',
             gstin: row.gstin,
             party_name: row.supplier_name,
-            invoice_no: row.doc_no,
+            books_bill_no: '-',
+            portal_doc_no: row.doc_no,
             invoice_date: row.doc_date,
             taxable: row.taxable,
             total_tax: row.total_tax,
-            variance: row.total_tax,
+            heads_breakup: `Portal(I:${row.igst}, C:${row.cgst}, S:${row.sgst}) | Books(-)`,
             recommended_action: 'Check physical bill copy and book in SAP to claim ITC'
           });
         }
@@ -1091,7 +1398,7 @@
     }
 
     // -------------------------------------------------------------
-    // DIRECT IN-BROWSER EXCEL DOWNLOAD (.xlsx)
+    // DIRECT IN-BROWSER EXCEL DOWNLOAD (.xlsx) WITH SIDE-BY-SIDE
     // -------------------------------------------------------------
     function downloadReconciledExcelDirect() {
       if (!currentReconData) {
@@ -1104,12 +1411,12 @@
         try {
           const wb = XLSX.utils.book_new();
 
-          // 1. Dashboard & KPI Tab
+          // 1. Dashboard & Summary Tab
           const k = currentReconData.kpis;
           const branch = document.getElementById('selectBranchFilter').value;
           const kpiAoa = [
-            ["GST RECONCILIATION SUMMARY (PORTAL vs SAP BOOKS)"],
-            ["Branch: " + branch, "Generated: " + new Date().toLocaleString()],
+            ["GST 2-WAY RECONCILIATION SUMMARY (PORTAL vs SAP BOOKS)"],
+            ["Branch: " + branch, "Generated: " + new Date().toLocaleString(), "Tolerance: ₹" + (document.getElementById('numTolerance').value || '2.00')],
             [],
             ["Key Metric", "Count / Invoices", "Total Amount (₹)"],
             ["Total ITC Recorded in SAP Books", k.totalBooksRows, k.totalBooksTax],
@@ -1122,47 +1429,114 @@
           const wsKpi = XLSX.utils.aoa_to_sheet(kpiAoa);
           XLSX.utils.book_append_sheet(wb, wsKpi, "Dashboard & Summary");
 
-          // 2. Vendor Pivot Check Tab
+          // 2. Vendor Pivot Check Tab (With Individual Heads)
           const vendorAoa = [
-            ["Supplier GSTIN", "Vendor / Supplier Name", "Status", "Books Tax (₹)", "Portal Tax (₹)", "Tax Variance (₹)", "Books Taxable", "Portal Taxable", "Books Bills Count", "Portal Bills Count"]
+            [
+              "Supplier GSTIN", "Vendor / Supplier Name", "Status",
+              "Books Total Tax", "Portal Total Tax", "Tax Variance (Books - Portal)",
+              "Books IGST", "Portal IGST", "IGST Variance",
+              "Books CGST", "Portal CGST", "CGST Variance",
+              "Books SGST", "Portal SGST", "SGST Variance",
+              "Books Taxable", "Portal Taxable", "Taxable Variance",
+              "Books Inv Count", "Portal Inv Count"
+            ]
           ];
           currentReconData.vendorSummary.forEach(v => {
-            vendorAoa.push([v.gstin, v.vendor_name, v.status, v.books_tax, v.portal_tax, v.tax_variance, v.books_taxable, v.portal_taxable, v.books_inv_count, v.portal_inv_count]);
+            vendorAoa.push([
+              v.gstin, v.vendor_name, v.status,
+              v.books_tax, v.portal_tax, v.tax_variance,
+              v.books_igst, v.portal_igst, v.igst_diff,
+              v.books_cgst, v.portal_cgst, v.cgst_diff,
+              v.books_sgst, v.portal_sgst, v.sgst_diff,
+              v.books_taxable, v.portal_taxable, v.taxable_variance,
+              v.books_inv_count, v.portal_inv_count
+            ]);
           });
           const wsVendor = XLSX.utils.aoa_to_sheet(vendorAoa);
           XLSX.utils.book_append_sheet(wb, wsVendor, "1_Vendor_Pivot_Check");
 
-          // 3. Books vs Portal Tab
+          // 3. Books vs Portal Tab (Side-by-Side Presentation!)
           const bvpAoa = [
-            ["Branch", "SAP Trans No", "Invoice Date", "Vendor Bill No", "Vendor Name", "Vendor GSTIN", "Books Taxable", "Books Total Tax", "Portal Doc No", "Portal Tax", "Tax Difference", "Reconciliation Status"]
+            [
+              "Supplier GSTIN", "Vendor Name",
+              "Books Bill No", "Portal Doc No",
+              "Match Status", "Match Reason / Typo Basis",
+              "Books Inv Date", "Portal Doc Date",
+              "Books Taxable", "Portal Taxable", "Taxable Diff",
+              "Books IGST", "Portal IGST", "IGST Diff",
+              "Books CGST", "Portal CGST", "CGST Diff",
+              "Books SGST", "Portal SGST", "SGST Diff",
+              "Books Total Tax", "Portal Total Tax", "Total Tax Diff",
+              "Branch", "SAP Trans No"
+            ]
           ];
           currentReconData.booksVsPortal.forEach(b => {
-            bvpAoa.push([b.branch, b.sap_trans_no, b.inv_date, b.bill_no, b.vendor_name, b.gstin, b.taxable, b.total_tax, b.portal_doc_no, b.portal_tax, b.tax_diff, b.match_status]);
+            bvpAoa.push([
+              b.gstin, b.vendor_name,
+              b.bill_no, b.portal_doc_no,
+              b.match_status, b.match_reason,
+              b.inv_date, b.portal_doc_date,
+              b.taxable, b.portal_taxable, b.taxable_diff,
+              b.igst, b.portal_igst, b.igst_diff,
+              b.cgst, b.portal_cgst, b.cgst_diff,
+              b.sgst, b.portal_sgst, b.sgst_diff,
+              b.total_tax, b.portal_tax, b.tax_diff,
+              b.branch, b.sap_trans_no
+            ]);
           });
           const wsBvp = XLSX.utils.aoa_to_sheet(bvpAoa);
           XLSX.utils.book_append_sheet(wb, wsBvp, "2_Books_vs_Portal");
 
-          // 4. Portal vs Books Tab
+          // 4. Portal vs Books Tab (Side-by-Side Presentation!)
           const pvbAoa = [
-            ["Supplier GSTIN", "Supplier Name", "Portal Doc No", "Doc Date", "Portal Taxable", "Portal Total Tax", "Matched Books Bill", "Books Tax", "Tax Difference", "Booking / Match Status"]
+            [
+              "Supplier GSTIN", "Supplier Name",
+              "Portal Doc No", "Books Bill No",
+              "Match Status", "Match Reason / Typo Basis",
+              "Portal Doc Date", "Books Inv Date",
+              "Portal Taxable", "Books Taxable", "Taxable Diff",
+              "Portal IGST", "Books IGST", "IGST Diff",
+              "Portal CGST", "Books CGST", "CGST Diff",
+              "Portal SGST", "Books SGST", "SGST Diff",
+              "Portal Total Tax", "Books Total Tax", "Total Tax Diff"
+            ]
           ];
           currentReconData.portalVsBooks.forEach(p => {
-            pvbAoa.push([p.gstin, p.supplier_name, p.doc_no, p.doc_date, p.taxable, p.total_tax, p.books_bill_no, p.books_tax, p.tax_diff, p.match_status]);
+            pvbAoa.push([
+              p.gstin, p.supplier_name,
+              p.doc_no, p.books_bill_no,
+              p.match_status, p.match_reason,
+              p.doc_date, p.books_inv_date,
+              p.taxable, p.books_taxable, p.taxable_diff,
+              p.igst, p.books_igst, p.igst_diff,
+              p.cgst, p.books_cgst, p.cgst_diff,
+              p.sgst, p.books_sgst, p.sgst_diff,
+              p.total_tax, p.books_tax, p.tax_diff
+            ]);
           });
           const wsPvb = XLSX.utils.aoa_to_sheet(pvbAoa);
           XLSX.utils.book_append_sheet(wb, wsPvb, "3_Portal_vs_Books");
 
           // 5. Actionable Discrepancies Tab
           const actAoa = [
-            ["Category", "Supplier GSTIN", "Party Name", "Invoice / Doc No", "Date", "Taxable Value", "Total Tax", "Recommended Action"]
+            [
+              "Category", "Supplier GSTIN", "Party Name",
+              "Books Bill No", "Portal Doc No", "Date",
+              "Taxable Value", "Total Tax", "Heads Breakup (IGST/CGST/SGST)",
+              "Audit Impact / Variance", "Recommended Action"
+            ]
           ];
           currentReconData.actionableList.forEach(a => {
-            actAoa.push([a.action_type, a.gstin, a.party_name, a.invoice_no, a.invoice_date, a.taxable, a.total_tax, a.recommended_action]);
+            actAoa.push([
+              a.action_type, a.gstin, a.party_name,
+              a.books_bill_no, a.portal_doc_no, a.invoice_date,
+              a.taxable, a.total_tax, a.heads_breakup,
+              a.action_type, a.recommended_action
+            ]);
           });
           const wsAct = XLSX.utils.aoa_to_sheet(actAoa);
           XLSX.utils.book_append_sheet(wb, wsAct, "4_Actionable_Discrepancies");
 
-          // Generate file buffer and trigger direct browser download
           const filename = `VSA_GST_Reconciliation_${branch.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
           
           const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
@@ -1174,7 +1548,6 @@
           }
           const blob = new Blob([s2ab(wbout)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
           
-          // Browser file save trigger
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.style.display = "none";
@@ -1217,51 +1590,55 @@
       document.getElementById('kpiUnbookedTax').innerText = formatCurrency(k.unbookedPortalTax);
       document.getElementById('kpiUnbookedCount').innerText = `${k.unbookedPortalCount} bills unbooked in SAP`;
 
-      // Badge Counts
       document.getElementById('badgeVendorCount').innerText = res.vendorSummary.length;
       document.getElementById('badgeBooksCount').innerText = res.booksVsPortal.length;
       document.getElementById('badgePortalCount').innerText = res.portalVsBooks.length;
       document.getElementById('badgeActionCount').innerText = res.actionableList.length;
 
-      // Update Filter Pill Counts
-      let vMatch = 0, vVar = 0, vOnlyB = 0, vOnlyP = 0;
+      // Filter Pill Counts
+      let vMatch = 0, vVar = 0, vHead = 0, vOnlyB = 0, vOnlyP = 0;
       res.vendorSummary.forEach(v => {
-        if (v.status === '100% Matched') vMatch++;
+        if (v.status.includes('100% Matched')) vMatch++;
+        else if (v.status.includes('Head Mismatch')) vHead++;
         else if (v.status === 'Tax Variance') vVar++;
         else if (v.status === 'Only in Books') vOnlyB++;
         else vOnlyP++;
       });
       document.getElementById('cntVendAll').innerText = res.vendorSummary.length;
       document.getElementById('cntVendMatched').innerText = vMatch;
+      document.getElementById('cntVendHeadMismatch').innerText = vHead;
       document.getElementById('cntVendVariance').innerText = vVar;
       document.getElementById('cntVendOnlyBooks').innerText = vOnlyB;
       document.getElementById('cntVendOnlyPortal').innerText = vOnlyP;
 
       // Books counts
-      let bMatch = 0, bMis = 0, bOnly = 0;
+      let bMatch = 0, bHead = 0, bMis = 0, bOnly = 0;
       res.booksVsPortal.forEach(b => {
         if (b.match_status.includes('Matched')) bMatch++;
+        else if (b.match_status.includes('Head Mismatch')) bHead++;
         else if (b.match_status === 'Value Mismatch') bMis++;
         else bOnly++;
       });
       document.getElementById('cntBvPAll').innerText = res.booksVsPortal.length;
       document.getElementById('cntBvPMatched').innerText = bMatch;
+      document.getElementById('cntBvPHeadMismatch').innerText = bHead;
       document.getElementById('cntBvPMismatch').innerText = bMis;
       document.getElementById('cntBvPMissing').innerText = bOnly;
 
       // Portal counts
-      let pMatch = 0, pMis = 0, pUnb = 0;
+      let pMatch = 0, pHead = 0, pMis = 0, pUnb = 0;
       res.portalVsBooks.forEach(p => {
         if (p.match_status.includes('Matched')) pMatch++;
+        else if (p.match_status.includes('Head Mismatch')) pHead++;
         else if (p.match_status === 'Value Mismatch') pMis++;
         else pUnb++;
       });
       document.getElementById('cntPvBAll').innerText = res.portalVsBooks.length;
       document.getElementById('cntPvBMatched').innerText = pMatch;
+      document.getElementById('cntPvBHeadMismatch').innerText = pHead;
       document.getElementById('cntPvBMismatch').innerText = pMis;
       document.getElementById('cntPvBUnbooked').innerText = pUnb;
 
-      // Render Tables
       filterVendorTable();
       filterBooksTable();
       filterPortalTable();
@@ -1279,18 +1656,24 @@
 
       const filtered = currentReconData.vendorSummary.filter(v => {
         const matchesQ = v.gstin.toLowerCase().includes(q) || v.vendor_name.toLowerCase().includes(q);
-        const matchesF = (vendorFilter === 'ALL') || (v.status === vendorFilter);
+        let matchesF = (vendorFilter === 'ALL');
+        if (vendorFilter === '100% Matched') matchesF = v.status.includes('100% Matched');
+        else if (vendorFilter === 'Tax Head Mismatch') matchesF = v.status.includes('Head Mismatch');
+        else if (vendorFilter === 'Tax Variance') matchesF = (v.status === 'Tax Variance');
+        else if (vendorFilter === 'Only in Books') matchesF = (v.status === 'Only in Books');
+        else if (vendorFilter === 'Only in Portal') matchesF = (v.status === 'Only in Portal');
         return matchesQ && matchesF;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-3 text-muted">No matching vendors found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-3 text-muted">No matching vendors found.</td></tr>';
         return;
       }
 
       filtered.forEach(v => {
         let badgeClass = 'badge-matched';
-        if (v.status === 'Tax Variance') badgeClass = 'badge-mismatch';
+        if (v.status.includes('Head Mismatch')) badgeClass = 'badge-head-mismatch';
+        else if (v.status === 'Tax Variance') badgeClass = 'badge-mismatch';
         else if (v.status === 'Only in Books') badgeClass = 'badge-missing-books';
         else if (v.status === 'Only in Portal') badgeClass = 'badge-missing-portal';
 
@@ -1302,6 +1685,8 @@
           <td class="text-end font-monospace">${formatCurrency(v.books_tax)}</td>
           <td class="text-end font-monospace">${formatCurrency(v.portal_tax)}</td>
           <td class="text-end font-monospace fw-bold ${v.tax_variance !== 0 ? 'text-danger' : 'text-success'}">${formatCurrency(v.tax_variance)}</td>
+          <td><span class="heads-pill">I:${v.books_igst} C:${v.books_cgst} S:${v.books_sgst}</span></td>
+          <td><span class="heads-pill">I:${v.portal_igst} C:${v.portal_cgst} S:${v.portal_sgst}</span></td>
           <td class="text-center">${v.books_inv_count}</td>
           <td class="text-center">${v.portal_inv_count}</td>
         `;
@@ -1323,37 +1708,42 @@
       tbody.innerHTML = '';
 
       const filtered = currentReconData.booksVsPortal.filter(b => {
-        const matchesQ = b.bill_no.toLowerCase().includes(q) || b.vendor_name.toLowerCase().includes(q) || b.gstin.toLowerCase().includes(q);
+        const matchesQ = b.bill_no.toLowerCase().includes(q) || b.portal_doc_no.toLowerCase().includes(q) || b.vendor_name.toLowerCase().includes(q) || b.gstin.toLowerCase().includes(q);
         let matchesF = true;
         if (booksFilter === 'Matched') matchesF = b.match_status.includes('Matched');
+        else if (booksFilter === 'Head Mismatch') matchesF = b.match_status.includes('Head Mismatch');
         else if (booksFilter === 'Value Mismatch') matchesF = (b.match_status === 'Value Mismatch');
-        else if (booksFilter === 'Only in Books') matchesF = (b.match_status === 'Only in Books (Missing in 2B)');
+        else if (booksFilter === 'Only in Books') matchesF = b.match_status.includes('Only in Books');
         return matchesQ && matchesF;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-3 text-muted">No matching records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center py-3 text-muted">No matching records found.</td></tr>';
         return;
       }
 
       filtered.forEach(b => {
         let badgeClass = 'badge-matched';
         if (b.match_status === 'Matched (Smart/Typo)') badgeClass = 'badge-smart';
+        else if (b.match_status.includes('Head Mismatch')) badgeClass = 'badge-head-mismatch';
         else if (b.match_status === 'Value Mismatch') badgeClass = 'badge-mismatch';
         else if (b.match_status.includes('Only in Books')) badgeClass = 'badge-missing-books';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="font-monospace small">${b.sap_trans_no}</td>
-          <td class="small">${b.inv_date}</td>
           <td class="fw-bold font-monospace">${b.bill_no}</td>
-          <td>${b.vendor_name}</td>
-          <td class="font-monospace small">${b.gstin}</td>
+          <td class="fw-bold font-monospace text-primary">${b.portal_doc_no}</td>
+          <td><span class="badge ${badgeClass}">${b.match_status}</span></td>
+          <td><div class="reason-text">${b.match_reason}</div></td>
+          <td class="small">${b.inv_date}</td>
+          <td class="small">${b.portal_doc_date}</td>
           <td class="text-end font-monospace">${formatCurrency(b.total_tax)}</td>
-          <td class="font-monospace text-primary">${b.portal_doc_no}</td>
           <td class="text-end font-monospace">${formatCurrency(b.portal_tax)}</td>
           <td class="text-end font-monospace ${b.tax_diff !== 0 ? 'text-danger fw-bold' : ''}">${formatCurrency(b.tax_diff)}</td>
-          <td><span class="badge ${badgeClass}">${b.match_status}</span></td>
+          <td><span class="heads-pill">I:${b.igst} C:${b.cgst} S:${b.sgst}</span></td>
+          <td><span class="heads-pill">I:${b.portal_igst} C:${b.portal_cgst} S:${b.portal_sgst}</span></td>
+          <td>${b.vendor_name}</td>
+          <td class="font-monospace small">${b.gstin}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -1373,36 +1763,42 @@
       tbody.innerHTML = '';
 
       const filtered = currentReconData.portalVsBooks.filter(p => {
-        const matchesQ = p.doc_no.toLowerCase().includes(q) || p.supplier_name.toLowerCase().includes(q) || p.gstin.toLowerCase().includes(q);
+        const matchesQ = p.doc_no.toLowerCase().includes(q) || p.books_bill_no.toLowerCase().includes(q) || p.supplier_name.toLowerCase().includes(q) || p.gstin.toLowerCase().includes(q);
         let matchesF = true;
         if (portalFilter === 'Matched') matchesF = p.match_status.includes('Matched');
+        else if (portalFilter === 'Head Mismatch') matchesF = p.match_status.includes('Head Mismatch');
         else if (portalFilter === 'Value Mismatch') matchesF = (p.match_status === 'Value Mismatch');
-        else if (portalFilter === 'Only in Portal') matchesF = (p.match_status === 'Only in Portal (Unbooked)');
+        else if (portalFilter === 'Only in Portal') matchesF = p.match_status.includes('Only in Portal');
         return matchesQ && matchesF;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-3 text-muted">No matching records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center py-3 text-muted">No matching records found.</td></tr>';
         return;
       }
 
       filtered.forEach(p => {
         let badgeClass = 'badge-matched';
         if (p.match_status === 'Matched (Smart/Typo)') badgeClass = 'badge-smart';
+        else if (p.match_status.includes('Head Mismatch')) badgeClass = 'badge-head-mismatch';
         else if (p.match_status === 'Value Mismatch') badgeClass = 'badge-mismatch';
         else if (p.match_status.includes('Only in Portal')) badgeClass = 'badge-missing-portal';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="font-monospace small">${p.gstin}</td>
-          <td>${p.supplier_name}</td>
           <td class="fw-bold font-monospace text-primary">${p.doc_no}</td>
+          <td class="fw-bold font-monospace">${p.books_bill_no}</td>
+          <td><span class="badge ${badgeClass}">${p.match_status}</span></td>
+          <td><div class="reason-text">${p.match_reason}</div></td>
           <td class="small">${p.doc_date}</td>
+          <td class="small">${p.books_inv_date}</td>
           <td class="text-end font-monospace">${formatCurrency(p.total_tax)}</td>
-          <td class="font-monospace">${p.books_bill_no}</td>
           <td class="text-end font-monospace">${formatCurrency(p.books_tax)}</td>
           <td class="text-end font-monospace ${p.tax_diff !== 0 ? 'text-danger fw-bold' : ''}">${formatCurrency(p.tax_diff)}</td>
-          <td><span class="badge ${badgeClass}">${p.match_status}</span></td>
+          <td><span class="heads-pill">I:${p.igst} C:${p.cgst} S:${p.sgst}</span></td>
+          <td><span class="heads-pill">I:${p.books_igst} C:${p.books_cgst} S:${p.books_sgst}</span></td>
+          <td>${p.supplier_name}</td>
+          <td class="font-monospace small">${p.gstin}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -1422,22 +1818,24 @@
       tbody.innerHTML = '';
 
       const filtered = currentReconData.actionableList.filter(a => {
-        const matchesQ = a.invoice_no.toLowerCase().includes(q) || a.party_name.toLowerCase().includes(q) || a.gstin.toLowerCase().includes(q);
+        const matchesQ = (a.books_bill_no || '').toLowerCase().includes(q) || (a.portal_doc_no || '').toLowerCase().includes(q) || a.party_name.toLowerCase().includes(q) || a.gstin.toLowerCase().includes(q);
         let matchesF = true;
         if (actionFilter === 'Missing in 2B') matchesF = a.action_type.includes('Missing in 2B');
+        else if (actionFilter === 'Head Mismatch') matchesF = a.action_type.includes('Head');
         else if (actionFilter === 'Value Discrepancy') matchesF = a.action_type.includes('Value');
         else if (actionFilter === 'Booking Pending') matchesF = a.action_type.includes('Booking');
         return matchesQ && matchesF;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-3 text-muted">No actionable records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-3 text-muted">No actionable records found.</td></tr>';
         return;
       }
 
       filtered.forEach(a => {
         let badgeClass = 'badge-missing-books';
         if (a.action_type.includes('Booking')) badgeClass = 'badge-missing-portal';
+        else if (a.action_type.includes('Head')) badgeClass = 'badge-head-mismatch';
         else if (a.action_type.includes('Value')) badgeClass = 'badge-mismatch';
 
         const tr = document.createElement('tr');
@@ -1445,13 +1843,15 @@
           <td><span class="badge ${badgeClass}">${a.action_type}</span></td>
           <td class="font-monospace small">${a.gstin}</td>
           <td>${a.party_name}</td>
-          <td class="fw-bold font-monospace">${a.invoice_no}</td>
+          <td class="fw-bold font-monospace">${a.books_bill_no}</td>
+          <td class="fw-bold font-monospace text-primary">${a.portal_doc_no}</td>
           <td class="small">${a.invoice_date}</td>
           <td class="text-end font-monospace">${formatCurrency(a.taxable)}</td>
           <td class="text-end font-monospace fw-bold">${formatCurrency(a.total_tax)}</td>
+          <td><span class="heads-pill">${a.heads_breakup}</span></td>
           <td class="small text-muted">${a.recommended_action}</td>
           <td class="text-center">
-            <button class="btn btn-sm btn-outline-secondary" onclick="copyReminderText('${a.party_name}', '${a.invoice_no}', '${a.invoice_date}', '${a.total_tax}')" title="Copy Follow-up Reminder">
+            <button class="btn btn-sm btn-outline-secondary" onclick="copyReminderText('${a.party_name}', '${a.books_bill_no}', '${a.invoice_date}', '${a.total_tax}')" title="Copy Follow-up Reminder">
               <i class="bi bi-copy"></i>
             </button>
           </td>
@@ -1482,15 +1882,10 @@
     function cleanInvoiceNo(val) {
       if (!val) return "";
       var s = String(val).trim().toUpperCase();
-      // 1. FY normalization: 2025-26 -> 25-26
       s = s.replace(/20(\d{2})[-/]?(\d{2})/g, '$1$2');
-      // 2. Single digit padding: /5/ -> /05/
       s = s.replace(/([/-])([0-9])([/-])/g, '$10$2$3');
-      // 3. Remove non-alphanumeric
       s = s.replace(/[^A-Z0-9]/g, '');
-      // 4. Remove leading zeros
       s = s.replace(/^0+/, '');
-      // 5. De-duplicate double paste (e.g. ABCABC -> ABC)
       var half = Math.floor(s.length / 2);
       if (half >= 5 && s.slice(0, half) === s.slice(half)) {
         s = s.slice(0, half);
