@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-  <!-- SheetJS for client-side Excel reading & writing -->
+  <!-- SheetJS for 100% In-Browser Excel Reading & Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
@@ -139,37 +139,48 @@
       padding: 0.3rem 0.85rem;
     }
 
-    .btn-run-recon {
+    /* Big Direct Download Button */
+    .btn-download-direct {
       background: linear-gradient(135deg, #28A745 0%, #1E7E34 100%);
       color: #FFFFFF;
       border: none;
-      font-weight: bold;
+      font-weight: 700;
       letter-spacing: 0.5px;
-      padding: 0.75rem 2rem;
-      border-radius: 30px;
-      box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-      transition: all 0.2s;
+      padding: 0.85rem 2.2rem;
+      border-radius: 35px;
+      box-shadow: 0 4px 14px rgba(40, 167, 69, 0.35);
+      transition: all 0.25s ease-in-out;
+      font-size: 1rem;
     }
-    .btn-run-recon:hover {
+    .btn-download-direct:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(40, 167, 69, 0.4);
+      box-shadow: 0 8px 20px rgba(40, 167, 69, 0.45);
       color: #FFFFFF;
     }
 
-    .btn-download-excel {
+    .btn-run-recon {
       background: linear-gradient(135deg, var(--vsa-navy) 0%, var(--vsa-blue) 100%);
       color: #FFFFFF;
       border: none;
-      font-weight: bold;
-      padding: 0.75rem 1.75rem;
-      border-radius: 30px;
-      box-shadow: 0 4px 12px rgba(31, 78, 121, 0.3);
-      transition: all 0.2s;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 0.85rem 1.85rem;
+      border-radius: 35px;
+      box-shadow: 0 4px 14px rgba(31, 78, 121, 0.3);
+      transition: all 0.25s ease-in-out;
+      font-size: 1rem;
     }
-    .btn-download-excel:hover {
+    .btn-run-recon:hover {
       transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(31, 78, 121, 0.4);
       color: #FFFFFF;
-      box-shadow: 0 6px 18px rgba(31, 78, 121, 0.4);
+    }
+
+    .success-download-banner {
+      background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+      border: 2px solid #81C784;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
     }
 
     .loading-overlay {
@@ -220,7 +231,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
           <div>
             <h5 class="fw-bold mb-1 text-dark"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Upload Files for 2-Way Reconciliation</h5>
-            <p class="text-muted small mb-0">Drag & drop your GST Portal file on the left, and SAP Purchase Register on the right.</p>
+            <p class="text-muted small mb-0">Drag & drop your GST Portal file on the left, and SAP Purchase Register on the right. Reconciliation happens directly in your browser.</p>
           </div>
           <div class="d-flex gap-3 align-items-center mt-2 mt-md-0">
             <div>
@@ -262,27 +273,45 @@
         </div>
 
         <!-- ACTION CONTROLS & BRANCH FILTER -->
-        <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top flex-wrap gap-2">
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top flex-wrap gap-3">
           <div class="d-flex align-items-center gap-2">
             <label class="form-label small fw-bold mb-0 text-muted">Branch Filter:</label>
-            <select class="form-select form-select-sm" id="selectBranchFilter" style="width: 220px;" onchange="onBranchFilterChange()">
+            <select class="form-select form-select-sm" id="selectBranchFilter" style="width: 230px;" onchange="onBranchFilterChange()">
               <option value="ALL">All Branches</option>
               <option value="Bangalore IOT">Bangalore IOT</option>
             </select>
-            <span class="text-muted small fst-italic" id="branchHint">Auto-populates from Books file</span>
+            <span class="text-muted small fst-italic" id="branchHint">Auto-detected from Books file</span>
           </div>
 
+          <!-- PRIMARY ACTION BUTTONS -->
           <div class="d-flex gap-2">
             <button class="btn btn-run-recon" id="btnRunReconciliation" onclick="startReconciliation()" disabled>
-              <i class="bi bi-play-circle-fill me-1"></i> Run 2-Way Reconciliation
+              <i class="bi bi-play-circle-fill me-1"></i> 1. Run 2-Way Reconciliation
             </button>
-            <button class="btn btn-download-excel" id="btnDownloadOutputExcel" onclick="downloadReconciledExcel()" disabled>
-              <i class="bi bi-file-earmark-arrow-down-fill me-1"></i> Download Reconciled Excel (.xlsx)
-            </button>
-            <button class="btn btn-outline-success btn-sm fw-semibold" id="btnExportDrive" onclick="exportToGoogleSheetUi()" disabled title="Save as Google Spreadsheet in Drive">
-              <i class="bi bi-google me-1"></i> Save to Drive
+            <button class="btn btn-download-direct" id="btnDownloadOutputExcel" onclick="downloadReconciledExcelDirect()" disabled>
+              <i class="bi bi-file-earmark-arrow-down-fill me-2 fs-5"></i> 2. Download Reconciled Excel (.xlsx)
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUCCESS DOWNLOAD NOTIFICATION BANNER (SHOWS UP AFTER RECONCILIATION) -->
+    <div class="success-download-banner mb-4 d-none shadow-sm" id="downloadBanner">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-success text-white p-3 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+            <i class="bi bi-check-lg fs-3"></i>
+          </div>
+          <div>
+            <h5 class="fw-bold text-dark mb-0">Reconciliation Completed Successfully!</h5>
+            <p class="text-muted small mb-0">Your 5-sheet comprehensive reconciliation report is ready to download to your computer.</p>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-success btn-lg fw-bold px-4 py-2 shadow-sm rounded-pill" onclick="downloadReconciledExcelDirect()">
+            <i class="bi bi-download me-2"></i> Download Excel (.xlsx) Directly Now
+          </button>
         </div>
       </div>
     </div>
@@ -574,7 +603,6 @@
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
           
-          // Detect sheet
           let targetSheet = workbook.SheetNames[0];
           for (let name of ['Bangalore IOT Portal', 'Purchase', 'Overview', 'Sheet1']) {
             if (workbook.SheetNames.includes(name)) { targetSheet = name; break; }
@@ -729,7 +757,6 @@
       const select = document.getElementById('selectBranchFilter');
       select.innerHTML = '<option value="ALL">All Branches (' + booksRows.length + ' rows)</option>';
 
-      // Sort by row count descending
       const sorted = Object.keys(branches).sort((a, b) => branches[b] - branches[a]);
       sorted.forEach(b => {
         const opt = document.createElement('option');
@@ -738,7 +765,6 @@
         select.appendChild(opt);
       });
 
-      // Default to Bangalore IOT if present, else ALL
       if (branches['Bangalore IOT']) {
         select.value = 'Bangalore IOT';
       }
@@ -752,7 +778,6 @@
     }
 
     function onBranchFilterChange() {
-      // If already reconciled, prompt to re-run
       if (currentReconData && rawBooksRows.length > 0) {
         startReconciliation();
       }
@@ -776,38 +801,22 @@
       const tol = parseFloat(document.getElementById('numTolerance').value) || 2.0;
       showLoading(`Executing 2-Check Matching Engine (${selectedBranch})...`);
 
-      // Run either via Apps Script backend or client-side
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(function(result) {
-            hideLoading();
-            currentReconData = result;
-            renderReconciliation(result);
-            enableActionButtons();
-          })
-          .withFailureHandler(function(err) {
-            // Fallback to client-side engine if server call fails
-            const clientRes = clientSideEngine(filteredBooks, rawPortalRows, tol);
-            hideLoading();
-            currentReconData = clientRes;
-            renderReconciliation(clientRes);
-            enableActionButtons();
-          })
-          .runReconciliation(filteredBooks, rawPortalRows, tol);
-      } else {
-        const clientRes = clientSideEngine(filteredBooks, rawPortalRows, tol);
+      // Run directly in-browser for instant zero-latency speed
+      setTimeout(() => {
+        const res = clientSideEngine(filteredBooks, rawPortalRows, tol);
         hideLoading();
-        currentReconData = clientRes;
-        renderReconciliation(clientRes);
-        enableActionButtons();
-      }
-    }
+        currentReconData = res;
+        renderReconciliation(res);
 
-    function enableActionButtons() {
-      document.getElementById('kpiRow').classList.remove('d-none');
-      document.getElementById('resultsSection').classList.remove('d-none');
-      document.getElementById('btnDownloadOutputExcel').disabled = false;
-      document.getElementById('btnExportDrive').disabled = false;
+        // Show KPI, Results, and Prominent Download Banner
+        document.getElementById('kpiRow').classList.remove('d-none');
+        document.getElementById('resultsSection').classList.remove('d-none');
+        document.getElementById('downloadBanner').classList.remove('d-none');
+        document.getElementById('btnDownloadOutputExcel').disabled = false;
+
+        // Smooth scroll to download banner
+        document.getElementById('downloadBanner').scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
 
     // -------------------------------------------------------------
@@ -822,7 +831,6 @@
             rawBooksRows = sampleData.books;
             rawPortalRows = sampleData.portal;
 
-            // Update dropzone UI
             document.getElementById('portalDropBox').classList.add('has-file');
             document.getElementById('portalFileInfo').classList.remove('d-none');
             document.getElementById('portalFileName').innerText = "Bangalore IOT_GST portal.xlsx";
@@ -847,7 +855,7 @@
     }
 
     // -------------------------------------------------------------
-    // CLIENT-SIDE ENGINE (EXACT PORT OF PYTHON / APPS SCRIPT LOGIC)
+    // CLIENT-SIDE ENGINE (CHECK 1 & CHECK 2 MATCHING LOGIC)
     // -------------------------------------------------------------
     function clientSideEngine(booksRows, portalRows, tolerance) {
       // Check 1: Vendor Pivot
@@ -1083,14 +1091,14 @@
     }
 
     // -------------------------------------------------------------
-    // INSTANT CLIENT-SIDE MULTI-TAB EXCEL DOWNLOAD (.xlsx)
+    // DIRECT IN-BROWSER EXCEL DOWNLOAD (.xlsx)
     // -------------------------------------------------------------
-    function downloadReconciledExcel() {
+    function downloadReconciledExcelDirect() {
       if (!currentReconData) {
         alert("Please run reconciliation first.");
         return;
       }
-      showLoading("Generating 5-Sheet Reconciled Excel Workbook (.xlsx)...");
+      showLoading("Building 5-Sheet Reconciled Excel File (.xlsx)...");
 
       setTimeout(() => {
         try {
@@ -1154,15 +1162,38 @@
           const wsAct = XLSX.utils.aoa_to_sheet(actAoa);
           XLSX.utils.book_append_sheet(wb, wsAct, "4_Actionable_Discrepancies");
 
-          // Trigger download
+          // Generate file buffer and trigger direct browser download
           const filename = `VSA_GST_Reconciliation_${branch.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
-          XLSX.writeFile(wb, filename);
+          
+          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+          function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+            return buf;
+          }
+          const blob = new Blob([s2ab(wbout)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+          
+          // Browser file save trigger
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.style.display = "none";
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 1000);
+
           hideLoading();
         } catch (err) {
           hideLoading();
-          alert("Error generating Excel file: " + err.message);
+          alert("Error downloading Excel file: " + err.message);
         }
-      }, 200);
+      }, 150);
     }
 
     // -------------------------------------------------------------
@@ -1441,27 +1472,6 @@
       navigator.clipboard.writeText(text).then(() => {
         alert("Follow-up reminder text copied to clipboard!");
       });
-    }
-
-    // -------------------------------------------------------------
-    // EXPORT TO GOOGLE DRIVE SHEET
-    // -------------------------------------------------------------
-    function exportToGoogleSheetUi() {
-      if (!currentReconData) return;
-      showLoading("Creating Google Spreadsheet with 5 Reconciled Tabs in Drive...");
-
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          if (confirm("Google Sheet created successfully!\n\nName: " + res.sheetName + "\n\nWould you like to open it now?")) {
-            window.open(res.sheetUrl, '_blank');
-          }
-        })
-        .withFailureHandler(function(err) {
-          hideLoading();
-          alert("Failed to export Google Sheet: " + err);
-        })
-        .exportToGoogleSheet(currentReconData);
     }
 
     // Utility helpers
