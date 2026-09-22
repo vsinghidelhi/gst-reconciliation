@@ -21,8 +21,20 @@ function cleanGstin(val) {
 
 function cleanInvoiceNo(val) {
   if (!val) return "";
-  var s = String(val).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  var s = String(val).trim().toUpperCase();
+  // 1. FY normalization: 2025-26 -> 25-26
+  s = s.replace(/20(\d{2})[-/]?(\d{2})/g, '$1$2');
+  // 2. Single digit padding: /5/ -> /05/
+  s = s.replace(/([/-])([0-9])([/-])/g, '$10$2$3');
+  // 3. Remove non-alphanumeric
+  s = s.replace(/[^A-Z0-9]/g, '');
+  // 4. Remove leading zeros
   s = s.replace(/^0+/, '');
+  // 5. De-duplicate double paste (e.g. ABCABC -> ABC)
+  var half = Math.floor(s.length / 2);
+  if (half >= 5 && s.slice(0, half) === s.slice(half)) {
+    s = s.slice(0, half);
+  }
   return s ? s : "0";
 }
 
