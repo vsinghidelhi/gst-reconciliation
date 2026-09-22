@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.append(r'C:\Users\lenovo\VSA_Compliance_Dashboard')
 from push_to_gas import get_valid_access_token
 
-SCRIPT_ID = "1sNUUfXkdLmukadK8qnhuvOpfFfBY2BLHM9Hjq_Vpn0dEH0vTF07HIPlP"
+SCRIPT_ID = "1hZGoAw_AX-mQtGgk3baPHUlU1X3o_AHqOEqUNBOEIujk0BX662fVWjtu"
 BASE_DIR = Path(__file__).resolve().parent
 
 def main():
