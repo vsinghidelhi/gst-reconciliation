@@ -39,10 +39,18 @@ def clean_invoice_no(val):
     if val is None:
         return ""
     s = str(val).strip().upper()
-    # Remove all special characters, slashes, dashes, spaces, underscores
+    # 1. Normalize Financial Year: 2025-26 -> 25-26, 2024-25 -> 24-25
+    s = re.sub(r'20(\d{2})[-/]?(\d{2})', r'\1\2', s)
+    # 2. Normalize single digits between separators: e.g. /5/ -> /05/, -4- -> -04-
+    s = re.sub(r'([/-])([0-9])([/-])', r'\g<1>0\2\3', s)
+    # 3. Remove all special characters, slashes, dashes, spaces, underscores
     s = re.sub(r'[^A-Z0-9]', '', s)
-    # Remove leading zeros
+    # 4. Remove leading zeros
     s = s.lstrip('0')
+    # 5. Handle accidental double paste: e.g. ABCABC -> ABC
+    half = len(s) // 2
+    if half >= 5 and s[:half] == s[half:]:
+        s = s[:half]
     return s if s else "0"
 
 def safe_float(val):
@@ -54,14 +62,20 @@ def safe_float(val):
         return 0.0
 
 def string_similarity(s1, s2):
-    """Simple fast character match ratio for invoice typo checks"""
+    """Deep similarity checker for accounting invoice typos & abbreviations"""
     if not s1 or not s2:
         return 0.0
     if s1 == s2:
         return 1.0
     if s1 in s2 or s2 in s1:
+        return 0.90
+    # Token prefix + suffix match (e.g. ESIVPLTechBOT2509 vs ESIVPLTB2509)
+    if len(s1) >= 6 and len(s2) >= 6 and s1[:4] == s2[:4] and s1[-4:] == s2[-4:]:
+        return 0.88
+    # 1 character substitution / typo (e.g. 0048 vs 004B)
+    if len(s1) == len(s2) and sum(1 for x, y in zip(s1, s2) if x != y) <= 1:
         return 0.85
-    # Check common suffix/prefix (last 4 characters)
+    # Common suffix/prefix (last 4 characters)
     if len(s1) >= 4 and len(s2) >= 4 and s1[-4:] == s2[-4:]:
         return 0.80
     return 0.0
@@ -269,9 +283,14 @@ class GSTReconciler:
             tax_diff = round(b_tax - p_tax, 2)
             taxable_diff = round(b_info['taxable'] - p_info['taxable'], 2)
 
+            vendor_bill_count = max(b_info['count'], p_info['count'])
+            dynamic_vendor_tol = max(self.tolerance, round(vendor_bill_count * 0.75, 2))
+
             if g in books_vendor_agg and g in portal_vendor_agg:
                 if abs(tax_diff) <= self.tolerance:
                     status = "100% Matched"
+                elif abs(tax_diff) <= dynamic_vendor_tol:
+                    status = "100% Matched (Round-off)"
                 else:
                     status = "Tax Variance"
             elif g in books_vendor_agg:
@@ -366,7 +385,23 @@ class GSTReconciler:
                 if tax_diff <= self.tolerance:
                     p_doc = p_row['clean_doc_no']
                     sim = string_similarity(c_bill, p_doc)
-                    if sim >= 0.80 or c_bill in p_doc or p_doc in c_bill:
+                    # Check 1: Similarity / Substring
+                    is_match = (sim >= 0.80 or c_bill in p_doc or p_doc in c_bill)
+                    # Check 2: Date placed in Doc No field by vendor (e.g. 16/07/2025 in doc no)
+                    clean_p_raw = re.sub(r'[^0-9]', '', p_row['doc_no'])
+                    if not is_match and len(clean_p_raw) >= 6:
+                        for row_i in b_agg['row_indices']:
+                            b_date_clean = re.sub(r'[^0-9]', '', self.books_rows[row_i]['inv_date'])
+                            if clean_p_raw in b_date_clean or b_date_clean in clean_p_raw:
+                                is_match = True
+                                break
+                    # Check 3: Empty bill in SAP with unique tax match for that vendor
+                    if not is_match and (not c_bill or c_bill == "0"):
+                        same_tax_count = sum(1 for pi in cand_indices if abs(self.portal_rows[pi]['total_tax'] - b_agg['total_tax']) <= self.tolerance)
+                        if same_tax_count == 1:
+                            is_match = True
+
+                    if is_match:
                         best_p_idx = p_idx
                         break
 
