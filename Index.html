@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-  <!-- SheetJS for client-side Excel reading -->
+  <!-- SheetJS for client-side Excel reading & writing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
@@ -29,6 +29,41 @@
       background: linear-gradient(135deg, var(--vsa-navy) 0%, var(--vsa-navy-dark) 100%);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       padding: 0.85rem 1.5rem;
+    }
+
+    /* Drag & Drop Upload Boxes */
+    .upload-box {
+      border: 2px dashed #CBD5E0;
+      border-radius: 12px;
+      background: #FFFFFF;
+      padding: 1.75rem 1.25rem;
+      text-align: center;
+      transition: all 0.25s ease-in-out;
+      cursor: pointer;
+      position: relative;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .upload-box:hover, .upload-box.dragover {
+      border-color: var(--vsa-blue);
+      background-color: #F0F7FF;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(46, 117, 182, 0.12);
+    }
+    .upload-box.has-file {
+      border-color: #28A745;
+      background-color: #F6FFF8;
+    }
+    .upload-box .upload-icon {
+      font-size: 2.8rem;
+      margin-bottom: 0.6rem;
+      color: var(--vsa-blue);
+    }
+    .upload-box.has-file .upload-icon {
+      color: #28A745;
     }
 
     .card-kpi {
@@ -104,10 +139,43 @@
       padding: 0.3rem 0.85rem;
     }
 
+    .btn-run-recon {
+      background: linear-gradient(135deg, #28A745 0%, #1E7E34 100%);
+      color: #FFFFFF;
+      border: none;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      padding: 0.75rem 2rem;
+      border-radius: 30px;
+      box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-run-recon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(40, 167, 69, 0.4);
+      color: #FFFFFF;
+    }
+
+    .btn-download-excel {
+      background: linear-gradient(135deg, var(--vsa-navy) 0%, var(--vsa-blue) 100%);
+      color: #FFFFFF;
+      border: none;
+      font-weight: bold;
+      padding: 0.75rem 1.75rem;
+      border-radius: 30px;
+      box-shadow: 0 4px 12px rgba(31, 78, 121, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-download-excel:hover {
+      transform: translateY(-2px);
+      color: #FFFFFF;
+      box-shadow: 0 6px 18px rgba(31, 78, 121, 0.4);
+    }
+
     .loading-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.88);
       z-index: 9999;
       display: flex;
       flex-direction: column;
@@ -131,19 +199,13 @@
       <div class="d-flex align-items-center">
         <div class="bg-white text-dark rounded px-2 py-1 me-2 fw-bold" style="font-size: 0.9rem; letter-spacing: 0.5px;">VSA</div>
         <div>
-          <span class="navbar-brand mb-0 h1 fw-bold fs-6">V. Singhi & Associates | GST 2-Way Reconciliation Portal</span>
-          <div class="text-white-50 small" style="font-size: 0.75rem;">Bi-Directional Engine: GST Portal (GSTR-2B) vs SAP Purchase Register</div>
+          <span class="navbar-brand mb-0 h1 fw-bold fs-6">V. Singhi & Associates | GST 2-Way Reconciliation Engine</span>
+          <div class="text-white-50 small" style="font-size: 0.75rem;">Bi-Directional Auto-Reconciliation: GST Portal (GSTR-2B) vs SAP Purchase Register</div>
         </div>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-light btn-sm fw-semibold" onclick="showUploadModal()">
-          <i class="bi bi-cloud-arrow-up me-1"></i> Upload Files
-        </button>
         <button class="btn btn-warning btn-sm fw-bold text-dark" onclick="loadBangaloreIotSample()">
           <i class="bi bi-lightning-charge-fill me-1"></i> Load Bangalore IOT Sample
-        </button>
-        <button class="btn btn-success btn-sm fw-semibold" id="btnExportSheet" onclick="exportToGoogleSheetUi()" disabled>
-          <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Sheet
         </button>
       </div>
     </div>
@@ -152,8 +214,81 @@
   <!-- Main Container -->
   <div class="container-fluid px-4 py-3">
 
+    <!-- UPLOAD SECTION (LEFT: PORTAL, RIGHT: BOOKS) -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+          <div>
+            <h5 class="fw-bold mb-1 text-dark"><i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i>Upload Files for 2-Way Reconciliation</h5>
+            <p class="text-muted small mb-0">Drag & drop your GST Portal file on the left, and SAP Purchase Register on the right.</p>
+          </div>
+          <div class="d-flex gap-3 align-items-center mt-2 mt-md-0">
+            <div>
+              <label class="form-label small fw-bold mb-1 text-muted">Round-off Tolerance</label>
+              <div class="input-group input-group-sm" style="width: 130px;">
+                <span class="input-group-text">₹</span>
+                <input type="number" class="form-control" id="numTolerance" value="2.0" step="0.5">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <!-- LEFT BOX: GST PORTAL (2B) -->
+          <div class="col-md-6">
+            <div class="upload-box" id="portalDropBox" onclick="document.getElementById('filePortalInput').click()">
+              <input type="file" id="filePortalInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handlePortalFile(this.files[0])">
+              <i class="bi bi-globe upload-icon" id="portalIcon"></i>
+              <h6 class="fw-bold text-dark mb-1" id="portalTitle">LEFT: GST Portal File (GSTR-2B)</h6>
+              <p class="text-muted small mb-2" id="portalSubtitle">Click to browse or Drag & Drop Portal Excel / CSV</p>
+              <div id="portalFileInfo" class="d-none badge bg-success-subtle text-success border border-success p-2 mt-1">
+                <i class="bi bi-check-circle-fill me-1"></i> <span id="portalFileName" class="fw-bold"></span> (<span id="portalRowCount"></span> rows detected)
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT BOX: SAP BOOKS (PURCHASE REGISTER) -->
+          <div class="col-md-6">
+            <div class="upload-box" id="booksDropBox" onclick="document.getElementById('fileBooksInput').click()">
+              <input type="file" id="fileBooksInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleBooksFile(this.files[0])">
+              <i class="bi bi-journal-text upload-icon" id="booksIcon"></i>
+              <h6 class="fw-bold text-dark mb-1" id="booksTitle">RIGHT: SAP Books File (Purchase Register)</h6>
+              <p class="text-muted small mb-2" id="booksSubtitle">Click to browse or Drag & Drop SAP Books Excel / CSV</p>
+              <div id="booksFileInfo" class="d-none badge bg-success-subtle text-success border border-success p-2 mt-1">
+                <i class="bi bi-check-circle-fill me-1"></i> <span id="booksFileName" class="fw-bold"></span> (<span id="booksRowCount"></span> rows detected)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTION CONTROLS & BRANCH FILTER -->
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <label class="form-label small fw-bold mb-0 text-muted">Branch Filter:</label>
+            <select class="form-select form-select-sm" id="selectBranchFilter" style="width: 220px;" onchange="onBranchFilterChange()">
+              <option value="ALL">All Branches</option>
+              <option value="Bangalore IOT">Bangalore IOT</option>
+            </select>
+            <span class="text-muted small fst-italic" id="branchHint">Auto-populates from Books file</span>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-run-recon" id="btnRunReconciliation" onclick="startReconciliation()" disabled>
+              <i class="bi bi-play-circle-fill me-1"></i> Run 2-Way Reconciliation
+            </button>
+            <button class="btn btn-download-excel" id="btnDownloadOutputExcel" onclick="downloadReconciledExcel()" disabled>
+              <i class="bi bi-file-earmark-arrow-down-fill me-1"></i> Download Reconciled Excel (.xlsx)
+            </button>
+            <button class="btn btn-outline-success btn-sm fw-semibold" id="btnExportDrive" onclick="exportToGoogleSheetUi()" disabled title="Save as Google Spreadsheet in Drive">
+              <i class="bi bi-google me-1"></i> Save to Drive
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- KPI Summary Row -->
-    <div class="row g-3 mb-4" id="kpiRow">
+    <div class="row g-3 mb-4 d-none" id="kpiRow">
       <div class="col-md-2 col-sm-6">
         <div class="card card-kpi border-primary p-3">
           <div class="text-muted small fw-bold text-uppercase">Total Books Tax</div>
@@ -199,7 +334,7 @@
     </div>
 
     <!-- Navigation Tabs -->
-    <div class="bg-white rounded shadow-sm">
+    <div class="bg-white rounded shadow-sm d-none" id="resultsSection">
       <ul class="nav nav-tabs px-3 pt-2" id="reconTabs" role="tablist">
         <li class="nav-item">
           <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabVendorPivot">
@@ -239,7 +374,6 @@
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setVendorFilter('Tax Variance', this)">Tax Variance (<span id="cntVendVariance">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setVendorFilter('Only in Books', this)">Only in Books (<span id="cntVendOnlyBooks">0</span>)</button>
               <button class="btn btn-outline-dark btn-sm filter-btn" onclick="setVendorFilter('Only in Portal', this)">Only in Portal (<span id="cntVendOnlyPortal">0</span>)</button>
-              <button class="btn btn-outline-primary btn-sm filter-btn ms-2" onclick="downloadCsv('vendor')"><i class="bi bi-download"></i> CSV</button>
             </div>
           </div>
           <div class="table-responsive" style="max-height: 520px;">
@@ -257,7 +391,7 @@
                 </tr>
               </thead>
               <tbody id="vendorTableBody">
-                <tr><td colspan="8" class="text-center py-4 text-muted">No data loaded. Click "Load Bangalore IOT Sample" or Upload Files.</td></tr>
+                <tr><td colspan="8" class="text-center py-4 text-muted">No data loaded.</td></tr>
               </tbody>
             </table>
           </div>
@@ -275,7 +409,6 @@
               <button class="btn btn-outline-success btn-sm filter-btn" onclick="setBooksFilter('Matched', this)">Matched (<span id="cntBvPMatched">0</span>)</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setBooksFilter('Value Mismatch', this)">Value Mismatch (<span id="cntBvPMismatch">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setBooksFilter('Only in Books', this)">Only in Books (<span id="cntBvPMissing">0</span>)</button>
-              <button class="btn btn-outline-primary btn-sm filter-btn ms-2" onclick="downloadCsv('books')"><i class="bi bi-download"></i> CSV</button>
             </div>
           </div>
           <div class="table-responsive" style="max-height: 520px;">
@@ -313,7 +446,6 @@
               <button class="btn btn-outline-success btn-sm filter-btn" onclick="setPortalFilter('Matched', this)">Matched (<span id="cntPvBMatched">0</span>)</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setPortalFilter('Value Mismatch', this)">Value Mismatch (<span id="cntPvBMismatch">0</span>)</button>
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setPortalFilter('Only in Portal', this)">Unbooked in SAP (<span id="cntPvBUnbooked">0</span>)</button>
-              <button class="btn btn-outline-primary btn-sm filter-btn ms-2" onclick="downloadCsv('portal')"><i class="bi bi-download"></i> CSV</button>
             </div>
           </div>
           <div class="table-responsive" style="max-height: 520px;">
@@ -350,7 +482,6 @@
               <button class="btn btn-outline-danger btn-sm filter-btn" onclick="setActionFilter('Missing in 2B', this)">Vendor Follow-up</button>
               <button class="btn btn-outline-warning btn-sm filter-btn" onclick="setActionFilter('Value Discrepancy', this)">Value Variance</button>
               <button class="btn btn-outline-dark btn-sm filter-btn" onclick="setActionFilter('Booking Pending', this)">Pending SAP Booking</button>
-              <button class="btn btn-outline-primary btn-sm filter-btn ms-2" onclick="downloadCsv('actionable')"><i class="bi bi-download"></i> CSV</button>
             </div>
           </div>
           <div class="table-responsive" style="max-height: 520px;">
@@ -379,52 +510,15 @@
     </div>
   </div>
 
-  <!-- Upload Modal -->
-  <div class="modal fade" id="uploadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header bg-light">
-          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-arrow-up me-2"></i>Upload Files for GST Reconciliation</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-bold">1. SAP Purchase Register (Books Excel)</label>
-              <input type="file" class="form-control" id="fileBooks" accept=".xlsx, .xls, .csv">
-              <div class="form-text small">Expects sheet 'Input' or columns: GST, Vendor Bill No, Taxable, Tax.</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold">2. GST Portal / GSTR-2B File (Excel)</label>
-              <input type="file" class="form-control" id="filePortal" accept=".xlsx, .xls, .csv">
-              <div class="form-text small">Expects columns: Supplier GSTIN, Doc No, Taxable, IGST, CGST, SGST.</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold">Branch Filter (Optional)</label>
-              <input type="text" class="form-control" id="txtBranchFilter" placeholder="e.g. Bangalore IOT (or leave blank for all)">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold">Round-off Tolerance (₹)</label>
-              <input type="number" class="form-control" id="numTolerance" value="2.0" step="0.5">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="processUploadedFiles()">
-            <i class="bi bi-play-circle-fill me-1"></i> Reconcile Uploaded Files
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
     // State storage
+    let rawPortalRows = [];
+    let rawBooksRows = [];
     let currentReconData = null;
+
     let vendorFilter = 'ALL';
     let booksFilter = 'ALL';
     let portalFilter = 'ALL';
@@ -437,17 +531,287 @@
     function hideLoading() {
       document.getElementById('loadingOverlay').classList.add('d-none');
     }
-    function showUploadModal() {
-      new bootstrap.Modal(document.getElementById('uploadModal')).show();
-    }
 
     function formatCurrency(num) {
       if (num === null || num === undefined || isNaN(num)) return '₹0.00';
       return '₹' + Number(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // Drag & Drop event bindings
+    setupDragDrop('portalDropBox', handlePortalFile);
+    setupDragDrop('booksDropBox', handleBooksFile);
+
+    function setupDragDrop(elemId, fileHandler) {
+      const dropArea = document.getElementById(elemId);
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+      function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+      });
+      dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) fileHandler(files[0]);
+      }, false);
+    }
+
     // -------------------------------------------------------------
-    // LOAD BANGALORE IOT SAMPLE DATA
+    // FILE PARSERS (SHEETJS IN BROWSER)
+    // -------------------------------------------------------------
+    function handlePortalFile(file) {
+      if (!file) return;
+      showLoading("Reading GST Portal File: " + file.name + " ...");
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Detect sheet
+          let targetSheet = workbook.SheetNames[0];
+          for (let name of ['Bangalore IOT Portal', 'Purchase', 'Overview', 'Sheet1']) {
+            if (workbook.SheetNames.includes(name)) { targetSheet = name; break; }
+          }
+          const sheet = workbook.Sheets[targetSheet];
+          const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+          rawPortalRows = parsePortalRows(jsonRows);
+          hideLoading();
+
+          // Update UI
+          document.getElementById('portalDropBox').classList.add('has-file');
+          document.getElementById('portalFileInfo').classList.remove('d-none');
+          document.getElementById('portalFileName').innerText = file.name;
+          document.getElementById('portalRowCount').innerText = rawPortalRows.length;
+          document.getElementById('portalSubtitle').innerText = "File loaded successfully!";
+
+          checkReadyToReconcile();
+        } catch (err) {
+          hideLoading();
+          alert("Failed to parse Portal file: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function parsePortalRows(rows) {
+      if (!rows || rows.length === 0) return [];
+      const colMap = {};
+      const sample = rows[0];
+      Object.keys(sample).forEach(key => {
+        const k = key.trim().toLowerCase();
+        if (k.includes('gstin') || k.includes('supplier gstin')) colMap.gstin = key;
+        else if (k.includes('doc no') || k.includes('invoice no') || k.includes('doc_no')) colMap.doc_no = key;
+        else if (k.includes('supplier name') || k.includes('trade name') || k.includes('name')) colMap.name = key;
+        else if (k.includes('doc date') || k.includes('invoice date') || k.includes('date')) colMap.date = key;
+        else if (k.includes('item taxable') || k.includes('taxable value') || k.includes('taxable')) colMap.taxable = key;
+        else if (k === 'igst') colMap.igst = key;
+        else if (k === 'cgst') colMap.cgst = key;
+        else if (k === 'sgst') colMap.sgst = key;
+      });
+
+      return rows.map((r, i) => {
+        const gstin = cleanGstin(r[colMap.gstin] || r['Supplier GSTIN'] || r['GSTIN']);
+        const doc_no = String(r[colMap.doc_no] || r['Doc No'] || r['Invoice No'] || '').trim();
+        const taxable = safeFloat(r[colMap.taxable] || r['Taxable Value'] || r['Item Taxable Value']);
+        const igst = safeFloat(r[colMap.igst] || r['IGST']);
+        const cgst = safeFloat(r[colMap.cgst] || r['CGST']);
+        const sgst = safeFloat(r[colMap.sgst] || r['SGST']);
+        return {
+          portal_id: i + 1,
+          gstin: gstin,
+          supplier_name: String(r[colMap.name] || r['Supplier Name'] || 'Vendor').trim(),
+          doc_no: doc_no,
+          doc_date: String(r[colMap.date] || r['Doc Date'] || r['Invoice Date'] || '').slice(0, 10),
+          taxable: taxable,
+          igst: igst,
+          cgst: cgst,
+          sgst: sgst,
+          total_tax: Math.round((igst + cgst + sgst) * 100) / 100
+        };
+      }).filter(r => r.gstin);
+    }
+
+    function handleBooksFile(file) {
+      if (!file) return;
+      showLoading("Reading SAP Books File: " + file.name + " ...");
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          let targetSheet = workbook.SheetNames[0];
+          if (workbook.SheetNames.includes('Input')) targetSheet = 'Input';
+          else if (workbook.SheetNames.includes('Sheet1')) targetSheet = 'Sheet1';
+          
+          const sheet = workbook.Sheets[targetSheet];
+          const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+          rawBooksRows = parseBooksRows(jsonRows);
+          hideLoading();
+
+          // Auto-populate branch dropdown
+          populateBranchDropdown(rawBooksRows);
+
+          // Update UI
+          document.getElementById('booksDropBox').classList.add('has-file');
+          document.getElementById('booksFileInfo').classList.remove('d-none');
+          document.getElementById('booksFileName').innerText = file.name;
+          document.getElementById('booksRowCount').innerText = rawBooksRows.length;
+          document.getElementById('booksSubtitle').innerText = "File loaded successfully!";
+
+          checkReadyToReconcile();
+        } catch (err) {
+          hideLoading();
+          alert("Failed to parse Books file: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function parseBooksRows(rows) {
+      if (!rows || rows.length === 0) return [];
+      const colMap = {};
+      const sample = rows[0];
+      Object.keys(sample).forEach(key => {
+        const k = key.trim().toLowerCase();
+        if (k === 'gst' || k.includes('vendor gst') || k.includes('gstin')) colMap.gstin = key;
+        else if (k.includes('vendor bill no') || k.includes('bill no') || k.includes('invoice no')) colMap.bill_no = key;
+        else if (k.includes('vendor name') || k.includes('name')) colMap.name = key;
+        else if (k.includes('branch name') || k.includes('branch')) colMap.branch = key;
+        else if (k.includes('invoice date') || k.includes('posting date') || k.includes('date')) colMap.date = key;
+        else if (k.includes('sap trans no') || k.includes('transaction number')) colMap.trans_no = key;
+        else if (k.includes('taxable value') || k.includes('taxable')) colMap.taxable = key;
+        else if (k === 'igst') colMap.igst = key;
+        else if (k === 'cgst') colMap.cgst = key;
+        else if (k === 'sgst') colMap.sgst = key;
+      });
+
+      return rows.map((r, i) => {
+        const gstin = cleanGstin(r[colMap.gstin] || r['GST'] || r['GSTIN']);
+        const bill_no = String(r[colMap.bill_no] || r['Vendor Bill No.'] || r['Bill No'] || '').trim();
+        const taxable = safeFloat(r[colMap.taxable] || r['Taxable Value']);
+        const igst = safeFloat(r[colMap.igst] || r['IGST']);
+        const cgst = safeFloat(r[colMap.cgst] || r['CGST']);
+        const sgst = safeFloat(r[colMap.sgst] || r['SGST']);
+        return {
+          row_id: i + 1,
+          branch: String(r[colMap.branch] || r['Branch Name'] || '').trim(),
+          sap_trans_no: String(r[colMap.trans_no] || r['SAP Trans No'] || r['Transaction Number'] || '').trim(),
+          inv_date: String(r[colMap.date] || r['Invoice Date'] || '').slice(0, 10),
+          bill_no: bill_no,
+          vendor_name: String(r[colMap.name] || r['Vendor Name'] || 'Vendor').trim(),
+          gstin: gstin,
+          taxable: taxable,
+          igst: igst,
+          cgst: cgst,
+          sgst: sgst,
+          total_tax: Math.round((igst + cgst + sgst) * 100) / 100
+        };
+      }).filter(r => r.gstin);
+    }
+
+    function populateBranchDropdown(booksRows) {
+      const branches = {};
+      booksRows.forEach(r => {
+        if (r.branch) branches[r.branch] = (branches[r.branch] || 0) + 1;
+      });
+
+      const select = document.getElementById('selectBranchFilter');
+      select.innerHTML = '<option value="ALL">All Branches (' + booksRows.length + ' rows)</option>';
+
+      // Sort by row count descending
+      const sorted = Object.keys(branches).sort((a, b) => branches[b] - branches[a]);
+      sorted.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b;
+        opt.innerText = `${b} (${branches[b]} rows)`;
+        select.appendChild(opt);
+      });
+
+      // Default to Bangalore IOT if present, else ALL
+      if (branches['Bangalore IOT']) {
+        select.value = 'Bangalore IOT';
+      }
+      document.getElementById('branchHint').innerText = `${sorted.length} branches found in SAP Books`;
+    }
+
+    function checkReadyToReconcile() {
+      if (rawPortalRows.length > 0 && rawBooksRows.length > 0) {
+        document.getElementById('btnRunReconciliation').disabled = false;
+      }
+    }
+
+    function onBranchFilterChange() {
+      // If already reconciled, prompt to re-run
+      if (currentReconData && rawBooksRows.length > 0) {
+        startReconciliation();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // RUN RECONCILIATION ENGINE
+    // -------------------------------------------------------------
+    function startReconciliation() {
+      const selectedBranch = document.getElementById('selectBranchFilter').value;
+      let filteredBooks = rawBooksRows;
+      if (selectedBranch !== 'ALL') {
+        filteredBooks = rawBooksRows.filter(r => r.branch.toLowerCase() === selectedBranch.toLowerCase());
+      }
+
+      if (filteredBooks.length === 0) {
+        alert("No rows found in Books for branch: " + selectedBranch);
+        return;
+      }
+
+      const tol = parseFloat(document.getElementById('numTolerance').value) || 2.0;
+      showLoading(`Executing 2-Check Matching Engine (${selectedBranch})...`);
+
+      // Run either via Apps Script backend or client-side
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideLoading();
+            currentReconData = result;
+            renderReconciliation(result);
+            enableActionButtons();
+          })
+          .withFailureHandler(function(err) {
+            // Fallback to client-side engine if server call fails
+            const clientRes = clientSideEngine(filteredBooks, rawPortalRows, tol);
+            hideLoading();
+            currentReconData = clientRes;
+            renderReconciliation(clientRes);
+            enableActionButtons();
+          })
+          .runReconciliation(filteredBooks, rawPortalRows, tol);
+      } else {
+        const clientRes = clientSideEngine(filteredBooks, rawPortalRows, tol);
+        hideLoading();
+        currentReconData = clientRes;
+        renderReconciliation(clientRes);
+        enableActionButtons();
+      }
+    }
+
+    function enableActionButtons() {
+      document.getElementById('kpiRow').classList.remove('d-none');
+      document.getElementById('resultsSection').classList.remove('d-none');
+      document.getElementById('btnDownloadOutputExcel').disabled = false;
+      document.getElementById('btnExportDrive').disabled = false;
+    }
+
+    // -------------------------------------------------------------
+    // LOAD BANGALORE IOT SAMPLE (INSTANT DEMO)
     // -------------------------------------------------------------
     function loadBangaloreIotSample() {
       showLoading("Loading Bangalore IOT Dataset & Running 2-Check Matching...");
@@ -455,39 +819,350 @@
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function(sampleData) {
-            runClientSideReconciliation(sampleData.books, sampleData.portal, 2.0);
+            rawBooksRows = sampleData.books;
+            rawPortalRows = sampleData.portal;
+
+            // Update dropzone UI
+            document.getElementById('portalDropBox').classList.add('has-file');
+            document.getElementById('portalFileInfo').classList.remove('d-none');
+            document.getElementById('portalFileName').innerText = "Bangalore IOT_GST portal.xlsx";
+            document.getElementById('portalRowCount').innerText = rawPortalRows.length;
+
+            document.getElementById('booksDropBox').classList.add('has-file');
+            document.getElementById('booksFileInfo').classList.remove('d-none');
+            document.getElementById('booksFileName').innerText = "Combined PR GST REPORT_Books.xlsx";
+            document.getElementById('booksRowCount').innerText = rawBooksRows.length;
+
+            populateBranchDropdown(rawBooksRows);
+            document.getElementById('selectBranchFilter').value = 'Bangalore IOT';
+
+            startReconciliation();
           })
           .withFailureHandler(function(err) {
             hideLoading();
-            alert("Error loading sample from backend: " + err);
+            alert("Error loading sample: " + err);
           })
           .getBangaloreIotSampleData();
-      } else {
-        // Standalone fallback
-        alert("Google Apps Script runtime detected. Loading data...");
       }
     }
 
     // -------------------------------------------------------------
-    // CLIENT-SIDE RUNNER FOR INSTANT FEEDBACK
+    // CLIENT-SIDE ENGINE (EXACT PORT OF PYTHON / APPS SCRIPT LOGIC)
     // -------------------------------------------------------------
-    function runClientSideReconciliation(booksRows, portalRows, tolerance) {
-      showLoading("Executing 2-Check Matching Engine...");
+    function clientSideEngine(booksRows, portalRows, tolerance) {
+      // Check 1: Vendor Pivot
+      const booksVendorAgg = {}, portalVendorAgg = {};
+      booksRows.forEach(b => {
+        const g = cleanGstin(b.gstin);
+        if (!g) return;
+        if (!booksVendorAgg[g]) booksVendorAgg[g] = { name: b.vendor_name || '', count: 0, taxable: 0, total_tax: 0 };
+        booksVendorAgg[g].count++;
+        booksVendorAgg[g].taxable += safeFloat(b.taxable);
+        booksVendorAgg[g].total_tax += safeFloat(b.total_tax);
+      });
 
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(function(result) {
-            hideLoading();
-            currentReconData = result;
-            renderReconciliation(result);
-            document.getElementById('btnExportSheet').disabled = false;
-          })
-          .withFailureHandler(function(err) {
-            hideLoading();
-            alert("Reconciliation error: " + err);
-          })
-          .runReconciliation(booksRows, portalRows, tolerance);
+      portalRows.forEach(p => {
+        const g = cleanGstin(p.gstin);
+        if (!g) return;
+        if (!portalVendorAgg[g]) portalVendorAgg[g] = { name: p.supplier_name || '', count: 0, taxable: 0, total_tax: 0 };
+        portalVendorAgg[g].count++;
+        portalVendorAgg[g].taxable += safeFloat(p.taxable);
+        portalVendorAgg[g].total_tax += safeFloat(p.total_tax);
+      });
+
+      const allGstins = Array.from(new Set([...Object.keys(booksVendorAgg), ...Object.keys(portalVendorAgg)])).sort();
+      const vendorSummary = allGstins.map(g => {
+        const b = booksVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0 };
+        const p = portalVendorAgg[g] || { name: '', count: 0, taxable: 0, total_tax: 0 };
+        const bTax = Math.round(b.total_tax * 100) / 100;
+        const pTax = Math.round(p.total_tax * 100) / 100;
+        const diff = Math.round((bTax - pTax) * 100) / 100;
+        let st = '';
+        if (booksVendorAgg[g] && portalVendorAgg[g]) st = Math.abs(diff) <= tolerance ? '100% Matched' : 'Tax Variance';
+        else if (booksVendorAgg[g]) st = 'Only in Books';
+        else st = 'Only in Portal';
+
+        return {
+          gstin: g,
+          vendor_name: b.name || p.name || 'Vendor',
+          status: st,
+          books_tax: bTax,
+          portal_tax: pTax,
+          tax_variance: diff,
+          books_taxable: Math.round(b.taxable * 100) / 100,
+          portal_taxable: Math.round(p.taxable * 100) / 100,
+          taxable_variance: Math.round((b.taxable - p.taxable) * 100) / 100,
+          books_inv_count: b.count,
+          portal_inv_count: p.count
+        };
+      });
+
+      // Check 2: Multi-line invoice aggregation & matching
+      const booksByKey = {};
+      booksRows.forEach((b, i) => {
+        const key = cleanGstin(b.gstin) + '||' + cleanInvoiceNo(b.bill_no);
+        if (!booksByKey[key]) booksByKey[key] = { gstin: cleanGstin(b.gstin), bill_no: b.bill_no, clean_bill: cleanInvoiceNo(b.bill_no), name: b.vendor_name, taxable: 0, total_tax: 0, rows: [] };
+        booksByKey[key].taxable += safeFloat(b.taxable);
+        booksByKey[key].total_tax += safeFloat(b.total_tax);
+        booksByKey[key].rows.push(i);
+      });
+
+      const portalByKey = {}, portalByGstin = {};
+      portalRows.forEach((p, j) => {
+        const key = cleanGstin(p.gstin) + '||' + cleanInvoiceNo(p.doc_no);
+        portalByKey[key] = j;
+        if (!portalByGstin[cleanGstin(p.gstin)]) portalByGstin[cleanGstin(p.gstin)] = [];
+        portalByGstin[cleanGstin(p.gstin)].push(j);
+      });
+
+      const matchedBooksKeys = {}, matchedPortalIndices = new Set();
+      // Pass 1: Exact
+      Object.keys(booksByKey).forEach(key => {
+        if (portalByKey.hasOwnProperty(key)) {
+          const pIdx = portalByKey[key];
+          const diff = Math.abs(booksByKey[key].total_tax - safeFloat(portalRows[pIdx].total_tax));
+          matchedBooksKeys[key] = { pIdx: pIdx, status: diff <= tolerance ? 'Matched (Exact)' : 'Value Mismatch' };
+          matchedPortalIndices.add(pIdx);
+        }
+      });
+
+      // Pass 2: Smart / Typo
+      Object.keys(booksByKey).forEach(key => {
+        if (matchedBooksKeys[key]) return;
+        const b = booksByKey[key];
+        const cand = portalByGstin[b.gstin] || [];
+        for (let pIdx of cand) {
+          if (matchedPortalIndices.has(pIdx)) continue;
+          const p = portalRows[pIdx];
+          const diff = Math.abs(b.total_tax - safeFloat(p.total_tax));
+          if (diff <= tolerance) {
+            const pDoc = cleanInvoiceNo(p.doc_no);
+            if (pDoc.includes(b.clean_bill) || b.clean_bill.includes(pDoc) || (b.clean_bill.length >= 4 && pDoc.slice(-4) === b.clean_bill.slice(-4))) {
+              matchedBooksKeys[key] = { pIdx: pIdx, status: 'Matched (Smart/Typo)' };
+              matchedPortalIndices.add(pIdx);
+              break;
+            }
+          }
+        }
+      });
+
+      // Build Views
+      const booksVsPortal = [], actionableList = [];
+      booksRows.forEach(b => {
+        const key = cleanGstin(b.gstin) + '||' + cleanInvoiceNo(b.bill_no);
+        const row = {
+          branch: b.branch || '',
+          sap_trans_no: b.sap_trans_no || '',
+          inv_date: b.inv_date || '',
+          bill_no: b.bill_no || '',
+          vendor_name: b.vendor_name || '',
+          gstin: cleanGstin(b.gstin),
+          taxable: safeFloat(b.taxable),
+          total_tax: safeFloat(b.total_tax),
+          portal_doc_no: '-',
+          portal_tax: 0,
+          tax_diff: safeFloat(b.total_tax),
+          match_status: 'Only in Books (Missing in 2B)'
+        };
+
+        if (matchedBooksKeys[key]) {
+          const m = matchedBooksKeys[key];
+          const p = portalRows[m.pIdx];
+          row.portal_doc_no = p.doc_no;
+          row.portal_tax = safeFloat(p.total_tax);
+          row.tax_diff = Math.round((booksByKey[key].total_tax - safeFloat(p.total_tax)) * 100) / 100;
+          row.match_status = m.status;
+        }
+        booksVsPortal.push(row);
+
+        if (row.match_status.includes('Only in Books')) {
+          actionableList.push({
+            action_type: 'Vendor Follow-up (Missing in 2B)',
+            gstin: row.gstin,
+            party_name: row.vendor_name,
+            invoice_no: row.bill_no,
+            invoice_date: row.inv_date,
+            taxable: row.taxable,
+            total_tax: row.total_tax,
+            variance: row.total_tax,
+            recommended_action: 'Send follow-up email/reminder to Vendor with Bill details'
+          });
+        } else if (row.match_status === 'Value Mismatch') {
+          actionableList.push({
+            action_type: 'Value Discrepancy Investigation',
+            gstin: row.gstin,
+            party_name: row.vendor_name,
+            invoice_no: row.bill_no,
+            invoice_date: row.inv_date,
+            taxable: row.taxable,
+            total_tax: row.total_tax,
+            variance: row.tax_diff,
+            recommended_action: 'Check tax rate/partial booking (Portal Tax: ₹' + row.portal_tax + ')'
+          });
+        }
+      });
+
+      const portalToBooks = {};
+      Object.keys(matchedBooksKeys).forEach(k => {
+        portalToBooks[matchedBooksKeys[k].pIdx] = { key: k, status: matchedBooksKeys[k].status };
+      });
+
+      const portalVsBooks = [];
+      portalRows.forEach((p, j) => {
+        const row = {
+          gstin: cleanGstin(p.gstin),
+          supplier_name: p.supplier_name || '',
+          doc_no: p.doc_no || '',
+          doc_date: p.doc_date || '',
+          taxable: safeFloat(p.taxable),
+          total_tax: safeFloat(p.total_tax),
+          books_bill_no: '-',
+          books_tax: 0,
+          tax_diff: safeFloat(p.total_tax),
+          match_status: 'Only in Portal (Unbooked)'
+        };
+        if (portalToBooks[j]) {
+          const k = portalToBooks[j].key;
+          const b = booksByKey[k];
+          row.books_bill_no = b.bill_no;
+          row.books_tax = Math.round(b.total_tax * 100) / 100;
+          row.tax_diff = Math.round((safeFloat(p.total_tax) - b.total_tax) * 100) / 100;
+          row.match_status = portalToBooks[j].status;
+        }
+        portalVsBooks.push(row);
+
+        if (row.match_status.includes('Only in Portal')) {
+          actionableList.push({
+            action_type: 'Accounting Booking Pending',
+            gstin: row.gstin,
+            party_name: row.supplier_name,
+            invoice_no: row.doc_no,
+            invoice_date: row.doc_date,
+            taxable: row.taxable,
+            total_tax: row.total_tax,
+            variance: row.total_tax,
+            recommended_action: 'Check physical bill copy and book in SAP to claim ITC'
+          });
+        }
+      });
+
+      // KPIs
+      let totalBooksTax = 0, matchedTax = 0, missingBooksTax = 0, matchedCount = 0, missingBooksCount = 0;
+      booksVsPortal.forEach(r => {
+        totalBooksTax += r.total_tax;
+        if (r.match_status.includes('Matched')) { matchedTax += r.total_tax; matchedCount++; }
+        else if (r.match_status.includes('Only in Books')) { missingBooksTax += r.total_tax; missingBooksCount++; }
+      });
+
+      let totalPortalTax = 0, unbookedPortalTax = 0, unbookedPortalCount = 0;
+      portalVsBooks.forEach(r => {
+        totalPortalTax += r.total_tax;
+        if (r.match_status.includes('Only in Portal')) { unbookedPortalTax += r.total_tax; unbookedPortalCount++; }
+      });
+
+      return {
+        kpis: {
+          totalBooksTax: Math.round(totalBooksTax * 100) / 100,
+          totalPortalTax: Math.round(totalPortalTax * 100) / 100,
+          netDifference: Math.round((totalBooksTax - totalPortalTax) * 100) / 100,
+          matchedTax: Math.round(matchedTax * 100) / 100,
+          matchedCount: matchedCount,
+          missingBooksTax: Math.round(missingBooksTax * 100) / 100,
+          missingBooksCount: missingBooksCount,
+          unbookedPortalTax: Math.round(unbookedPortalTax * 100) / 100,
+          unbookedPortalCount: unbookedPortalCount,
+          totalBooksRows: booksRows.length,
+          totalPortalRows: portalRows.length,
+          totalVendors: vendorSummary.length
+        },
+        vendorSummary: vendorSummary,
+        booksVsPortal: booksVsPortal,
+        portalVsBooks: portalVsBooks,
+        actionableList: actionableList
+      };
+    }
+
+    // -------------------------------------------------------------
+    // INSTANT CLIENT-SIDE MULTI-TAB EXCEL DOWNLOAD (.xlsx)
+    // -------------------------------------------------------------
+    function downloadReconciledExcel() {
+      if (!currentReconData) {
+        alert("Please run reconciliation first.");
+        return;
       }
+      showLoading("Generating 5-Sheet Reconciled Excel Workbook (.xlsx)...");
+
+      setTimeout(() => {
+        try {
+          const wb = XLSX.utils.book_new();
+
+          // 1. Dashboard & KPI Tab
+          const k = currentReconData.kpis;
+          const branch = document.getElementById('selectBranchFilter').value;
+          const kpiAoa = [
+            ["GST RECONCILIATION SUMMARY (PORTAL vs SAP BOOKS)"],
+            ["Branch: " + branch, "Generated: " + new Date().toLocaleString()],
+            [],
+            ["Key Metric", "Count / Invoices", "Total Amount (₹)"],
+            ["Total ITC Recorded in SAP Books", k.totalBooksRows, k.totalBooksTax],
+            ["Total ITC Available in Portal (2B)", k.totalPortalRows, k.totalPortalTax],
+            ["Net Variance (Books - Portal)", "-", k.netDifference],
+            ["Reconciled ITC (Matched Invoices)", k.matchedCount, k.matchedTax],
+            ["ITC at Risk (Missing in 2B)", k.missingBooksCount, k.missingBooksTax],
+            ["Unclaimed ITC (Unbooked in SAP)", k.unbookedPortalCount, k.unbookedPortalTax]
+          ];
+          const wsKpi = XLSX.utils.aoa_to_sheet(kpiAoa);
+          XLSX.utils.book_append_sheet(wb, wsKpi, "Dashboard & Summary");
+
+          // 2. Vendor Pivot Check Tab
+          const vendorAoa = [
+            ["Supplier GSTIN", "Vendor / Supplier Name", "Status", "Books Tax (₹)", "Portal Tax (₹)", "Tax Variance (₹)", "Books Taxable", "Portal Taxable", "Books Bills Count", "Portal Bills Count"]
+          ];
+          currentReconData.vendorSummary.forEach(v => {
+            vendorAoa.push([v.gstin, v.vendor_name, v.status, v.books_tax, v.portal_tax, v.tax_variance, v.books_taxable, v.portal_taxable, v.books_inv_count, v.portal_inv_count]);
+          });
+          const wsVendor = XLSX.utils.aoa_to_sheet(vendorAoa);
+          XLSX.utils.book_append_sheet(wb, wsVendor, "1_Vendor_Pivot_Check");
+
+          // 3. Books vs Portal Tab
+          const bvpAoa = [
+            ["Branch", "SAP Trans No", "Invoice Date", "Vendor Bill No", "Vendor Name", "Vendor GSTIN", "Books Taxable", "Books Total Tax", "Portal Doc No", "Portal Tax", "Tax Difference", "Reconciliation Status"]
+          ];
+          currentReconData.booksVsPortal.forEach(b => {
+            bvpAoa.push([b.branch, b.sap_trans_no, b.inv_date, b.bill_no, b.vendor_name, b.gstin, b.taxable, b.total_tax, b.portal_doc_no, b.portal_tax, b.tax_diff, b.match_status]);
+          });
+          const wsBvp = XLSX.utils.aoa_to_sheet(bvpAoa);
+          XLSX.utils.book_append_sheet(wb, wsBvp, "2_Books_vs_Portal");
+
+          // 4. Portal vs Books Tab
+          const pvbAoa = [
+            ["Supplier GSTIN", "Supplier Name", "Portal Doc No", "Doc Date", "Portal Taxable", "Portal Total Tax", "Matched Books Bill", "Books Tax", "Tax Difference", "Booking / Match Status"]
+          ];
+          currentReconData.portalVsBooks.forEach(p => {
+            pvbAoa.push([p.gstin, p.supplier_name, p.doc_no, p.doc_date, p.taxable, p.total_tax, p.books_bill_no, p.books_tax, p.tax_diff, p.match_status]);
+          });
+          const wsPvb = XLSX.utils.aoa_to_sheet(pvbAoa);
+          XLSX.utils.book_append_sheet(wb, wsPvb, "3_Portal_vs_Books");
+
+          // 5. Actionable Discrepancies Tab
+          const actAoa = [
+            ["Category", "Supplier GSTIN", "Party Name", "Invoice / Doc No", "Date", "Taxable Value", "Total Tax", "Recommended Action"]
+          ];
+          currentReconData.actionableList.forEach(a => {
+            actAoa.push([a.action_type, a.gstin, a.party_name, a.invoice_no, a.invoice_date, a.taxable, a.total_tax, a.recommended_action]);
+          });
+          const wsAct = XLSX.utils.aoa_to_sheet(actAoa);
+          XLSX.utils.book_append_sheet(wb, wsAct, "4_Actionable_Discrepancies");
+
+          // Trigger download
+          const filename = `VSA_GST_Reconciliation_${branch.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+          XLSX.writeFile(wb, filename);
+          hideLoading();
+        } catch (err) {
+          hideLoading();
+          alert("Error generating Excel file: " + err.message);
+        }
+      }, 200);
     }
 
     // -------------------------------------------------------------
@@ -769,13 +1444,10 @@
     }
 
     // -------------------------------------------------------------
-    // EXPORT TO GOOGLE SHEET
+    // EXPORT TO GOOGLE DRIVE SHEET
     // -------------------------------------------------------------
     function exportToGoogleSheetUi() {
-      if (!currentReconData) {
-        alert("Please run or load reconciliation data first.");
-        return;
-      }
+      if (!currentReconData) return;
       showLoading("Creating Google Spreadsheet with 5 Reconciled Tabs in Drive...");
 
       google.script.run
@@ -792,53 +1464,22 @@
         .exportToGoogleSheet(currentReconData);
     }
 
-    // -------------------------------------------------------------
-    // DOWNLOAD CSV
-    // -------------------------------------------------------------
-    function downloadCsv(type) {
-      if (!currentReconData) {
-        alert("Please run reconciliation first.");
-        return;
-      }
-      let rows = [];
-      let filename = `GST_Reconciliation_${type}.csv`;
-
-      if (type === 'vendor') {
-        rows.push(["Supplier GSTIN", "Vendor Name", "Status", "Books Tax", "Portal Tax", "Tax Variance", "Books Count", "Portal Count"]);
-        currentReconData.vendorSummary.forEach(v => {
-          rows.push([v.gstin, `"${v.vendor_name}"`, v.status, v.books_tax, v.portal_tax, v.tax_variance, v.books_inv_count, v.portal_inv_count]);
-        });
-      } else if (type === 'books') {
-        rows.push(["SAP Trans No", "Date", "Vendor Bill No", "Vendor Name", "Vendor GSTIN", "Books Tax", "Portal Doc No", "Portal Tax", "Difference", "Status"]);
-        currentReconData.booksVsPortal.forEach(b => {
-          rows.push([b.sap_trans_no, b.inv_date, `"${b.bill_no}"`, `"${b.vendor_name}"`, b.gstin, b.total_tax, `"${b.portal_doc_no}"`, b.portal_tax, b.tax_diff, b.match_status]);
-        });
-      } else if (type === 'portal') {
-        rows.push(["Supplier GSTIN", "Supplier Name", "Portal Doc No", "Doc Date", "Portal Tax", "Matched Books Bill", "Books Tax", "Difference", "Status"]);
-        currentReconData.portalVsBooks.forEach(p => {
-          rows.push([p.gstin, `"${p.supplier_name}"`, `"${p.doc_no}"`, p.doc_date, p.total_tax, `"${p.books_bill_no}"`, p.books_tax, p.tax_diff, p.match_status]);
-        });
-      } else if (type === 'actionable') {
-        rows.push(["Category", "Supplier GSTIN", "Party Name", "Invoice No", "Date", "Taxable Value", "Total Tax", "Recommended Action"]);
-        currentReconData.actionableList.forEach(a => {
-          rows.push([`"${a.action_type}"`, a.gstin, `"${a.party_name}"`, `"${a.invoice_no}"`, a.invoice_date, a.taxable, a.total_tax, `"${a.recommended_action}"`]);
-        });
-      }
-
-      let csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-      let encodedUri = encodeURI(csvContent);
-      let link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    // Utility helpers
+    function cleanGstin(val) {
+      if (!val) return "";
+      return String(val).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
-
-    // Auto load on start
-    window.addEventListener('DOMContentLoaded', () => {
-      loadBangaloreIotSample();
-    });
+    function cleanInvoiceNo(val) {
+      if (!val) return "";
+      var s = String(val).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      s = s.replace(/^0+/, '');
+      return s ? s : "0";
+    }
+    function safeFloat(val) {
+      if (val === null || val === undefined || val === "") return 0.0;
+      var num = parseFloat(String(val).replace(/,/g, ''));
+      return isNaN(num) ? 0.0 : Math.round(num * 100) / 100;
+    }
   </script>
 </body>
 </html>
