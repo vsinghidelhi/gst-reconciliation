@@ -39,6 +39,9 @@ HEADERS = {
 FILES_TO_UPLOAD = [
     "reconciler.py",
     "run_reconciliation.py",
+    "Code.gs",
+    "Index.html",
+    "deploy_to_gas.py",
     "requirements.txt",
     ".gitignore",
     "README.md",
