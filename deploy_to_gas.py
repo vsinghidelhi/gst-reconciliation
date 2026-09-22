@@ -42,7 +42,7 @@ def main():
         "runtimeVersion": "V8",
         "webapp": {
             "executeAs": "USER_DEPLOYING",
-            "access": "ANYONE"
+            "access": "ANYONE_ANONYMOUS"
         }
     }
 
