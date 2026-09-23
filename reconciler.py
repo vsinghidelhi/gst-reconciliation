@@ -357,10 +357,13 @@ class GSTReconciler:
 
             if g in books_vendor_agg and g in portal_vendor_agg:
                 heads_match = (abs(igst_diff) <= dynamic_vendor_tol and abs(cgst_diff) <= dynamic_vendor_tol and abs(sgst_diff) <= dynamic_vendor_tol)
-                if abs(tax_diff) <= self.tolerance and heads_match:
+                taxable_match = (abs(taxable_diff) <= dynamic_vendor_tol)
+                if abs(tax_diff) <= self.tolerance and heads_match and taxable_match:
                     status = "100% Matched"
                 elif abs(tax_diff) <= dynamic_vendor_tol and not heads_match:
                     status = "Tax Head Mismatch (IGST vs CGST/SGST)"
+                elif not taxable_match:
+                    status = "Taxable Variance"
                 else:
                     status = "Tax Variance"
             elif g in books_vendor_agg:
@@ -456,18 +459,22 @@ class GSTReconciler:
             if k in portal_by_key:
                 p_idx = portal_by_key[k]
                 p_row = self.portal_rows[p_idx]
+                diff_taxable = round(abs(b_agg['taxable'] - p_row['taxable']), 2)
                 diff_tot = round(abs(b_agg['total_tax'] - p_row['total_tax']), 2)
                 diff_igst = round(abs(b_agg['igst'] - p_row['igst']), 2)
                 diff_cgst = round(abs(b_agg['cgst'] - p_row['cgst']), 2)
                 diff_sgst = round(abs(b_agg['sgst'] - p_row['sgst']), 2)
 
-                if diff_tot <= self.tolerance:
+                if diff_taxable <= self.tolerance and diff_tot <= self.tolerance:
                     if diff_igst <= self.tolerance and diff_cgst <= self.tolerance and diff_sgst <= self.tolerance:
                         status = "Matched (Exact)"
-                        reason = "Exact Match: Invoice No & All Tax Heads (IGST/CGST/SGST)"
+                        reason = "Exact Match: Invoice No, Taxable Value & All Tax Heads (IGST/CGST/SGST)"
                     else:
                         status = "Tax Head Mismatch (IGST vs CGST/SGST)"
                         reason = f"Total Tax matches, but Head Mismatch: Books(I:{b_agg['igst']:.2f}, C:{b_agg['cgst']:.2f}, S:{b_agg['sgst']:.2f}) vs Portal(I:{p_row['igst']:.2f}, C:{p_row['cgst']:.2f}, S:{p_row['sgst']:.2f})"
+                elif diff_tot <= self.tolerance and diff_taxable > self.tolerance:
+                    status = "Value Mismatch"
+                    reason = f"Tax matches, but Taxable Value difference is ₹{diff_taxable:.2f} (Books: ₹{b_agg['taxable']:.2f}, Portal: ₹{p_row['taxable']:.2f})"
                 else:
                     status = "Value Mismatch"
                     reason = f"Invoice matches, but Tax difference is ₹{diff_tot:.2f} (Books: ₹{b_agg['total_tax']:.2f}, Portal: ₹{p_row['total_tax']:.2f})"
@@ -492,12 +499,13 @@ class GSTReconciler:
                 if p_idx in matched_portal_indices:
                     continue
                 p_row = self.portal_rows[p_idx]
+                diff_taxable = round(abs(b_agg['taxable'] - p_row['taxable']), 2)
                 diff_tot = round(abs(b_agg['total_tax'] - p_row['total_tax']), 2)
                 diff_igst = round(abs(b_agg['igst'] - p_row['igst']), 2)
                 diff_cgst = round(abs(b_agg['cgst'] - p_row['cgst']), 2)
                 diff_sgst = round(abs(b_agg['sgst'] - p_row['sgst']), 2)
 
-                if diff_tot <= self.tolerance:
+                if diff_tot <= self.tolerance and diff_taxable <= self.tolerance:
                     is_match, reason = diagnose_smart_match(
                         b_agg['bill_no'], p_row['doc_no'],
                         c_bill, p_row['clean_doc_no'],
@@ -507,7 +515,7 @@ class GSTReconciler:
                     # Also handle blank bill no in Books if exactly one unique bill exists for that vendor with same tax
                     is_blank_bill = (not c_bill or c_bill == "0" or str(c_bill).startswith("DOC_"))
                     if not is_match and is_blank_bill:
-                        same_tax_count = sum(1 for pi in cand_indices if abs(self.portal_rows[pi]['total_tax'] - b_agg['total_tax']) <= self.tolerance)
+                        same_tax_count = sum(1 for pi in cand_indices if abs(self.portal_rows[pi]['total_tax'] - b_agg['total_tax']) <= self.tolerance and abs(self.portal_rows[pi]['taxable'] - b_agg['taxable']) <= self.tolerance)
                         if same_tax_count == 1:
                             is_match = True
                             reason = f"Blank Bill No in Books: Unique bill for vendor {b_agg['vendor_name']}"
