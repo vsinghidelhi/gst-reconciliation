@@ -353,15 +353,12 @@ class GSTReconciler:
 
             taxable_diff = round(b_info['taxable'] - p_info['taxable'], 2)
 
-            vendor_bill_count = max(b_info['count'], p_info['count'])
-            dynamic_vendor_tol = max(self.tolerance, round(vendor_bill_count * 0.75, 2))
+            dynamic_vendor_tol = self.tolerance
 
             if g in books_vendor_agg and g in portal_vendor_agg:
                 heads_match = (abs(igst_diff) <= dynamic_vendor_tol and abs(cgst_diff) <= dynamic_vendor_tol and abs(sgst_diff) <= dynamic_vendor_tol)
                 if abs(tax_diff) <= self.tolerance and heads_match:
                     status = "100% Matched"
-                elif abs(tax_diff) <= dynamic_vendor_tol and heads_match:
-                    status = "100% Matched (Round-off)"
                 elif abs(tax_diff) <= dynamic_vendor_tol and not heads_match:
                     status = "Tax Head Mismatch (IGST vs CGST/SGST)"
                 else:
@@ -400,29 +397,47 @@ class GSTReconciler:
         # -------------------------------------------------------------
         print("[*] Executing Check 2: Invoice & Amount Level Matching (3 Tax Heads)...")
 
-        # Aggregate multi-line invoices in Books
+        # Aggregate multi-line invoices in Books at Invoice level
         books_by_key = {}
         for idx, r in enumerate(self.books_rows):
-            k = (r['gstin'], r['clean_bill_no'])
+            c_bill = r['clean_bill_no']
+            if not c_bill or c_bill == "0":
+                doc_ref = r['sap_trans_no'] if r['sap_trans_no'] else f"ROW_{idx}"
+                k = (r['gstin'], f"DOC_{doc_ref}")
+            else:
+                k = (r['gstin'], c_bill)
+
             if k not in books_by_key:
                 books_by_key[k] = {
-                    'gstin': r['gstin'],
-                    'clean_bill_no': r['clean_bill_no'],
-                    'bill_no': r['bill_no'],
-                    'inv_date': r['inv_date'],
-                    'vendor_name': r['vendor_name'],
+                    'row_id': r.get('row_id', idx),
+                    'branch': r.get('branch', ''),
+                    'doc_type': r.get('doc_type', ''),
+                    'trans_no': r.get('trans_no', ''),
+                    'sap_trans_no': r.get('sap_trans_no', ''),
+                    'posting_date': r.get('posting_date', ''),
+                    'inv_date': r.get('inv_date', ''),
+                    'bill_no': r.get('bill_no', ''),
+                    'clean_bill_no': c_bill,
+                    'vendor_code': r.get('vendor_code', ''),
+                    'vendor_name': r.get('vendor_name', ''),
+                    'gstin': r.get('gstin', ''),
+                    'rcm': r.get('rcm', ''),
+                    'line_count': 0,
                     'taxable': 0.0,
                     'total_tax': 0.0,
                     'igst': 0.0,
                     'cgst': 0.0,
                     'sgst': 0.0,
+                    'total_val': 0.0,
                     'row_indices': []
                 }
-            books_by_key[k]['taxable'] += r['taxable']
-            books_by_key[k]['total_tax'] += r['total_tax']
-            books_by_key[k]['igst'] += r['igst']
-            books_by_key[k]['cgst'] += r['cgst']
-            books_by_key[k]['sgst'] += r['sgst']
+            books_by_key[k]['line_count'] += 1
+            books_by_key[k]['taxable'] = round(books_by_key[k]['taxable'] + r['taxable'], 2)
+            books_by_key[k]['total_tax'] = round(books_by_key[k]['total_tax'] + r['total_tax'], 2)
+            books_by_key[k]['igst'] = round(books_by_key[k]['igst'] + r['igst'], 2)
+            books_by_key[k]['cgst'] = round(books_by_key[k]['cgst'] + r['cgst'], 2)
+            books_by_key[k]['sgst'] = round(books_by_key[k]['sgst'] + r['sgst'], 2)
+            books_by_key[k]['total_val'] = round(books_by_key[k]['total_val'] + r.get('total_val', 0.0), 2)
             books_by_key[k]['row_indices'].append(idx)
 
         # Index Portal invoices by (GSTIN, Clean_Doc_No)
@@ -490,7 +505,8 @@ class GSTReconciler:
                     )
 
                     # Also handle blank bill no in Books if exactly one unique bill exists for that vendor with same tax
-                    if not is_match and (not c_bill or c_bill == "0"):
+                    is_blank_bill = (not c_bill or c_bill == "0" or str(c_bill).startswith("DOC_"))
+                    if not is_match and is_blank_bill:
                         same_tax_count = sum(1 for pi in cand_indices if abs(self.portal_rows[pi]['total_tax'] - b_agg['total_tax']) <= self.tolerance)
                         if same_tax_count == 1:
                             is_match = True
@@ -513,48 +529,51 @@ class GSTReconciler:
                 matched_portal_indices.add(best_p_idx)
 
         # -------------------------------------------------------------
-        # BUILD VIEW 1: BOOKS VS PORTAL (Side-by-Side Presentation)
+        # BUILD VIEW 1: BOOKS VS PORTAL (Strictly Side-by-Side, 1 Row per Invoice)
         # -------------------------------------------------------------
         print("[*] Generating Books vs Portal detailed side-by-side mapping...")
-        for r in self.books_rows:
-            k = (r['gstin'], r['clean_bill_no'])
+        for k, b_agg in books_by_key.items():
+            b_recon_row = dict(b_agg)
+            if b_agg['line_count'] > 1:
+                b_recon_row['sap_trans_no'] = f"{b_agg['sap_trans_no']} ({b_agg['line_count']} items)"
+
             if k in matched_books_keys:
                 p_idx, match_status, match_reason = matched_books_keys[k]
                 p_row = self.portal_rows[p_idx]
-                b_agg = books_by_key[k]
 
-                b_recon_row = dict(r)
                 b_recon_row['portal_doc_no'] = p_row['doc_no']
                 b_recon_row['portal_doc_date'] = p_row['doc_date']
                 b_recon_row['portal_taxable'] = p_row['taxable']
-                b_recon_row['taxable_diff'] = round(r['taxable'] - p_row['taxable'], 2)
+                b_recon_row['taxable_diff'] = round(b_agg['taxable'] - p_row['taxable'], 2)
                 b_recon_row['portal_igst'] = p_row['igst']
-                b_recon_row['igst_diff'] = round(r['igst'] - p_row['igst'], 2)
+                b_recon_row['igst_diff'] = round(b_agg['igst'] - p_row['igst'], 2)
                 b_recon_row['portal_cgst'] = p_row['cgst']
-                b_recon_row['cgst_diff'] = round(r['cgst'] - p_row['cgst'], 2)
+                b_recon_row['cgst_diff'] = round(b_agg['cgst'] - p_row['cgst'], 2)
                 b_recon_row['portal_sgst'] = p_row['sgst']
-                b_recon_row['sgst_diff'] = round(r['sgst'] - p_row['sgst'], 2)
+                b_recon_row['sgst_diff'] = round(b_agg['sgst'] - p_row['sgst'], 2)
                 b_recon_row['portal_total_tax'] = p_row['total_tax']
                 b_recon_row['tax_diff'] = round(b_agg['total_tax'] - p_row['total_tax'], 2)
                 b_recon_row['match_status'] = match_status
-                b_recon_row['match_reason'] = match_reason
+                if b_agg['line_count'] > 1:
+                    b_recon_row['match_reason'] = f"{match_reason} (Consolidated {b_agg['line_count']} line items in Books)"
+                else:
+                    b_recon_row['match_reason'] = match_reason
                 self.books_recon.append(b_recon_row)
             else:
-                b_recon_row = dict(r)
                 b_recon_row['portal_doc_no'] = "-"
                 b_recon_row['portal_doc_date'] = "-"
                 b_recon_row['portal_taxable'] = 0.0
-                b_recon_row['taxable_diff'] = r['taxable']
+                b_recon_row['taxable_diff'] = b_agg['taxable']
                 b_recon_row['portal_igst'] = 0.0
-                b_recon_row['igst_diff'] = r['igst']
+                b_recon_row['igst_diff'] = b_agg['igst']
                 b_recon_row['portal_cgst'] = 0.0
-                b_recon_row['cgst_diff'] = r['cgst']
+                b_recon_row['cgst_diff'] = b_agg['cgst']
                 b_recon_row['portal_sgst'] = 0.0
-                b_recon_row['sgst_diff'] = r['sgst']
+                b_recon_row['sgst_diff'] = b_agg['sgst']
                 b_recon_row['portal_total_tax'] = 0.0
-                b_recon_row['tax_diff'] = r['total_tax']
+                b_recon_row['tax_diff'] = b_agg['total_tax']
                 b_recon_row['match_status'] = "Only in Books (Missing in 2B)"
-                b_recon_row['match_reason'] = "Vendor has not filed invoice in GSTR-1 or GSTIN mismatch"
+                b_recon_row['match_reason'] = "Vendor has not filed invoice in GSTR-1 or GSTIN mismatch" + (f" ({b_agg['line_count']} items)" if b_agg['line_count'] > 1 else "")
                 self.books_recon.append(b_recon_row)
 
         # -------------------------------------------------------------
