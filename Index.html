@@ -1038,8 +1038,11 @@
         let st = '';
         if (booksVendorAgg[g] && portalVendorAgg[g]) {
           const headsMatch = (Math.abs(igstDiff) <= dynamicTol && Math.abs(cgstDiff) <= dynamicTol && Math.abs(sgstDiff) <= dynamicTol);
-          if (Math.abs(diff) <= tolerance && headsMatch) st = '100% Matched';
+          const taxableDiff = Math.round((b.taxable - p.taxable) * 100) / 100;
+          const taxableMatch = (Math.abs(taxableDiff) <= dynamicTol);
+          if (Math.abs(diff) <= tolerance && headsMatch && taxableMatch) st = '100% Matched';
           else if (Math.abs(diff) <= dynamicTol && !headsMatch) st = 'Tax Head Mismatch (IGST vs CGST/SGST)';
+          else if (!taxableMatch) st = 'Taxable Variance';
           else st = 'Tax Variance';
         } else if (booksVendorAgg[g]) {
           st = 'Only in Books';
@@ -1128,20 +1131,24 @@
           const p = portalRows[pIdx];
           const b = booksByKey[key];
 
+          const diffTaxable = Math.round(Math.abs(b.taxable - safeFloat(p.taxable)) * 100) / 100;
           const diffTot = Math.round(Math.abs(b.total_tax - safeFloat(p.total_tax)) * 100) / 100;
           const diffIgst = Math.round(Math.abs(b.igst - safeFloat(p.igst)) * 100) / 100;
           const diffCgst = Math.round(Math.abs(b.cgst - safeFloat(p.cgst)) * 100) / 100;
           const diffSgst = Math.round(Math.abs(b.sgst - safeFloat(p.sgst)) * 100) / 100;
 
           let st = '', rsn = '';
-          if (diffTot <= tolerance) {
+          if (diffTaxable <= tolerance && diffTot <= tolerance) {
             if (diffIgst <= tolerance && diffCgst <= tolerance && diffSgst <= tolerance) {
               st = 'Matched (Exact)';
-              rsn = 'Exact Match: Invoice No & All Tax Heads (IGST/CGST/SGST)';
+              rsn = 'Exact Match: Invoice No, Taxable Value & All Tax Heads (IGST/CGST/SGST)';
             } else {
               st = 'Tax Head Mismatch (IGST vs CGST/SGST)';
               rsn = `Total Tax matches, but Head Mismatch: Books(I:${b.igst}, C:${b.cgst}, S:${b.sgst}) vs Portal(I:${p.igst}, C:${p.cgst}, S:${p.sgst})`;
             }
+          } else if (diffTot <= tolerance && diffTaxable > tolerance) {
+            st = 'Value Mismatch';
+            rsn = `Tax matches, but Taxable Value difference is ₹${diffTaxable.toFixed(2)} (Books: ₹${b.taxable.toFixed(2)}, Portal: ₹${safeFloat(p.taxable).toFixed(2)})`;
           } else {
             st = 'Value Mismatch';
             rsn = `Invoice matches, but Tax difference is ₹${diffTot.toFixed(2)}`;
@@ -1164,19 +1171,20 @@
           if (matchedPortalIndices.has(pIdx)) continue;
           const p = portalRows[pIdx];
 
+          const diffTaxable = Math.round(Math.abs(b.taxable - safeFloat(p.taxable)) * 100) / 100;
           const diffTot = Math.round(Math.abs(b.total_tax - safeFloat(p.total_tax)) * 100) / 100;
           const diffIgst = Math.round(Math.abs(b.igst - safeFloat(p.igst)) * 100) / 100;
           const diffCgst = Math.round(Math.abs(b.cgst - safeFloat(p.cgst)) * 100) / 100;
           const diffSgst = Math.round(Math.abs(b.sgst - safeFloat(p.sgst)) * 100) / 100;
 
-          if (diffTot <= tolerance) {
+          if (diffTot <= tolerance && diffTaxable <= tolerance) {
             const diag = diagnoseSmartMatch(b.bill_no, p.doc_no, b.clean_bill, cleanInvoiceNo(p.doc_no), b.inv_date, p.doc_date);
             let isMatch = diag.match;
             let reason = diag.reason;
 
             const isBlankBill = (!b.clean_bill || b.clean_bill === '0' || (b.clean_bill + '').indexOf('DOC_') === 0);
             if (!isMatch && isBlankBill) {
-              const sameTaxCount = cand.filter(pi => Math.abs(safeFloat(portalRows[pi].total_tax) - b.total_tax) <= tolerance).length;
+              const sameTaxCount = cand.filter(pi => Math.abs(safeFloat(portalRows[pi].total_tax) - b.total_tax) <= tolerance && Math.abs(safeFloat(portalRows[pi].taxable) - b.taxable) <= tolerance).length;
               if (sameTaxCount === 1) {
                 isMatch = true;
                 reason = `Blank Bill No in Books: Unique bill for vendor ${b.vendor_name || b.name}`;
