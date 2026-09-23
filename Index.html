@@ -285,6 +285,15 @@
                 <i class="bi bi-check-circle-fill me-1"></i> <span id="portalFileName" class="fw-bold"></span> (<span id="portalRowCount"></span> rows detected)
               </div>
             </div>
+            <!-- Dynamic Schema Detection Badge: Portal -->
+            <div id="portalSchemaCard" class="card mt-2 p-2 border bg-light d-none" style="font-size: 0.8rem; border-radius: 8px;">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-primary fw-bold"><i class="bi bi-magic me-1"></i> Auto-Detected Portal Schema</span>
+                <button class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.72rem;" onclick="openMappingModal('portal')"><i class="bi bi-gear-fill me-1"></i> Review / Custom Map</button>
+              </div>
+              <div class="text-muted small" id="portalSchemaSummary">Sheet: <b>-</b>, Header: <b>Row 1</b></div>
+              <div class="d-flex flex-wrap gap-1 mt-1" id="portalSchemaPills"></div>
+            </div>
           </div>
 
           <!-- RIGHT BOX: SAP BOOKS (PURCHASE REGISTER) -->
@@ -297,6 +306,15 @@
               <div id="booksFileInfo" class="d-none badge bg-success-subtle text-success border border-success p-2 mt-1">
                 <i class="bi bi-check-circle-fill me-1"></i> <span id="booksFileName" class="fw-bold"></span> (<span id="booksRowCount"></span> rows detected)
               </div>
+            </div>
+            <!-- Dynamic Schema Detection Badge: Books -->
+            <div id="booksSchemaCard" class="card mt-2 p-2 border bg-light d-none" style="font-size: 0.8rem; border-radius: 8px;">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-success fw-bold"><i class="bi bi-magic me-1"></i> Auto-Detected Books Schema</span>
+                <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.72rem;" onclick="openMappingModal('books')"><i class="bi bi-gear-fill me-1"></i> Review / Custom Map</button>
+              </div>
+              <div class="text-muted small" id="booksSchemaSummary">Sheet: <b>-</b>, Header: <b>Row 1</b></div>
+              <div class="d-flex flex-wrap gap-1 mt-1" id="booksSchemaPills"></div>
             </div>
           </div>
         </div>
@@ -581,6 +599,120 @@
 
       </div>
     </div>
+  <!-- Modal: Dynamic Column Mapping Review & Custom Configuration -->
+  <div class="modal fade" id="columnMappingModal" tabindex="-1" aria-labelledby="columnMappingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content shadow border-0">
+        <div class="modal-header bg-dark text-white py-2 px-3">
+          <h6 class="modal-title fw-bold" id="columnMappingModalLabel">
+            <i class="bi bi-sliders me-2 text-warning"></i> Column Mapping Configuration: <span id="modalTargetLabel" class="text-warning">SAP Books</span>
+          </h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="alert alert-info py-2 px-3 small d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <i class="bi bi-info-circle-fill me-1"></i> The AI system auto-detected these columns. You can change sheet, header row, or map any column manually.
+            </div>
+            <span id="modalScoreBadge" class="badge bg-success">Detection Score: High</span>
+          </div>
+
+          <div class="row g-2 mb-3 bg-light p-2 rounded border">
+            <div class="col-md-7">
+              <label class="form-label small fw-bold mb-1">Source Sheet</label>
+              <select id="modalSelectSheet" class="form-select form-select-sm" onchange="onModalSheetChange()"></select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small fw-bold mb-1">Header Row (1-indexed)</label>
+              <input type="number" id="modalInputHeaderRow" class="form-control form-control-sm" min="1" max="25" value="1" onchange="onModalHeaderChange()">
+            </div>
+          </div>
+
+          <h6 class="fw-bold text-dark small border-bottom pb-1 mb-2">Column Field Mappings</h6>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold text-danger">Supplier GSTIN *</label>
+              <select id="map_gstin" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold text-danger">Invoice / Bill No *</label>
+              <select id="map_bill_no" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold text-danger">Taxable Value *</label>
+              <select id="map_taxable" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold">CGST (Hold Ctrl to select multiple)</label>
+              <select id="map_cgst" class="form-select form-select-sm mapping-select" multiple size="3" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold">SGST (Hold Ctrl to select multiple)</label>
+              <select id="map_sgst" class="form-select form-select-sm mapping-select" multiple size="3" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1 fw-bold">IGST (Hold Ctrl to select multiple)</label>
+              <select id="map_igst" class="form-select form-select-sm mapping-select" multiple size="3" onchange="updateModalPreview()"></select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small mb-1">Invoice Date</label>
+              <select id="map_inv_date" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">Party / Supplier Name</label>
+              <select id="map_vendor_name" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4" id="divModalBranch">
+              <label class="form-label small mb-1">Branch / Location</label>
+              <select id="map_branch" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small mb-1">Total Invoice Value</label>
+              <select id="map_total_val" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4" id="divModalTransNo">
+              <label class="form-label small mb-1">SAP Trans No / Voucher No</label>
+              <select id="map_sap_trans_no" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+            <div class="col-md-4" id="divModalPostDate">
+              <label class="form-label small mb-1">Posting Date</label>
+              <select id="map_posting_date" class="form-select form-select-sm mapping-select" onchange="updateModalPreview()"></select>
+            </div>
+          </div>
+
+          <h6 class="fw-bold text-dark small border-bottom pb-1 mt-3 mb-2">Live Data Extraction Preview (First 3 Rows)</h6>
+          <div class="table-responsive bg-white border rounded" style="max-height: 180px;">
+            <table class="table table-sm table-bordered mb-0 small">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>GSTIN</th>
+                  <th>Bill / Doc No</th>
+                  <th>Party Name</th>
+                  <th>Inv Date</th>
+                  <th class="text-end">Taxable (₹)</th>
+                  <th class="text-end">CGST (₹)</th>
+                  <th class="text-end">SGST (₹)</th>
+                  <th class="text-end">IGST (₹)</th>
+                  <th class="text-end">Total Tax (₹)</th>
+                  <th id="thPreviewBranch">Branch</th>
+                </tr>
+              </thead>
+              <tbody id="modalPreviewTableBody">
+                <tr><td colspan="11" class="text-center py-2 text-muted">Select columns to preview</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer py-2 px-3 bg-light">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm px-3" onclick="applyCustomMapping()"><i class="bi bi-check2-circle me-1"></i> Save & Apply Mapping</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Bootstrap Bundle JS -->
@@ -591,6 +723,12 @@
     let rawPortalRows = [];
     let rawBooksRows = [];
     let currentReconData = null;
+
+    let currentBooksWorkbook = null;
+    let currentPortalWorkbook = null;
+    let booksSchemaInfo = null;
+    let portalSchemaInfo = null;
+    let activeModalTarget = 'books'; // 'books' or 'portal'
 
     let vendorFilter = 'ALL';
     let booksFilter = 'ALL';
@@ -608,6 +746,40 @@
     function formatCurrency(num) {
       if (num === null || num === undefined || isNaN(num)) return '₹0.00';
       return '₹' + Number(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function cleanStr(val) {
+      if (val === null || val === undefined) return '';
+      return String(val).trim();
+    }
+
+    function colLetter(idx) {
+      if (idx === undefined || idx === null || idx < 0) return '-';
+      let letter = '';
+      let temp = idx;
+      while (temp >= 0) {
+        letter = String.fromCharCode((temp % 26) + 65) + letter;
+        temp = Math.floor(temp / 26) - 1;
+      }
+      return letter;
+    }
+
+    function cleanDateStr(val) {
+      if (val === null || val === undefined || val === '') return '';
+      if (val instanceof Date) {
+        return val.toISOString().slice(0, 10);
+      }
+      let s = String(val).trim();
+      if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+        return s.slice(0, 10);
+      }
+      const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+      if (m) {
+        const d = m[1].padStart(2, '0');
+        const mth = m[2].padStart(2, '0');
+        return `${m[3]}-${mth}-${d}`;
+      }
+      return s.slice(0, 10);
     }
 
     // Drag & Drop event bindings
@@ -635,27 +807,322 @@
     }
 
     // -------------------------------------------------------------
-    // FILE PARSERS (SHEETJS IN BROWSER)
+    // DYNAMIC COLUMN DEFINITIONS & SMART AUTO-DETECTION ENGINE
+    // -------------------------------------------------------------
+    const FIELD_DEFINITIONS = {
+      gstin: {
+        aliases: ['gstin/uin', 'supplier gstin', 'party gstin', 'vendor gstin', 'gstin', 'gst no', 'gst number', 'ctin', 'supplier gst', 'party gst', 'gst'],
+        exclusions: ['original', 'amended', 'rate', 'code', 'diff', 'variance', 'cgst', 'sgst', 'igst', 'type', 'amount', 'amt', 'value', 'val', 'summary', 'pivot', '%'],
+        multi: false,
+        weight: 5
+      },
+      bill_no: {
+        aliases: ['vendor bill no', 'bill no', 'vendor doc no', 'invoice no', 'inv no', 'bill number', 'invoice number', 'voucher no', 'vch no', 'doc no', 'document no', 'ref no', 'reference no', 'supplier inv no', 'supplier invoice'],
+        exclusions: ['original', 'amended', 'date', 'dt', 'rate', 'type', 'amount', 'amt', 'tax', 'total', 'value', 'val', 'diff', 'variance', 'code', '%'],
+        multi: false,
+        weight: 5
+      },
+      inv_date: {
+        aliases: ['invoice date', 'bill date', 'inv date', 'doc date', 'document date', 'vch date', 'voucher date', 'bill dt', 'inv dt', 'date'],
+        exclusions: ['original', 'amended', 'posting', 'entry', 'create', 'creation', 'due', 'r1', 'filing', 'reconcile'],
+        multi: false,
+        weight: 2
+      },
+      posting_date: {
+        aliases: ['posting date', 'post date', 'entry date', 'creation date', 'create date', 'clearing date'],
+        exclusions: ['original', 'invoice', 'inv', 'bill', 'doc date'],
+        multi: false,
+        weight: 1
+      },
+      vendor_name: {
+        aliases: ['vendor name', 'supplier name', 'party name', 'name of supplier', 'customer/vendor name', 'trade name', 'party', 'vendor', 'supplier'],
+        exclusions: ['original', 'code', 'id', 'gst', 'pan', 'state', 'city', 'address', 'branch', 'type'],
+        multi: false,
+        weight: 2
+      },
+      vendor_code: {
+        aliases: ['customer/vendor code', 'vendor code', 'supplier code', 'party code', 'vendor id', 'supplier id', 'account code'],
+        exclusions: ['original', 'name', 'gst', 'pan'],
+        multi: false,
+        weight: 1
+      },
+      taxable: {
+        aliases: ['taxable value', 'taxable amount', 'taxable val', 'item taxable value', 'taxable amt', 'assessable value', 'base amount', 'basic amount', 'net amount', 'taxable'],
+        exclusions: ['original', 'amended', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate', '%', 'code', 'total'],
+        multi: false,
+        weight: 4
+      },
+      cgst: {
+        aliases: ['cgst amount', 'cgst amt', 'cgst val', 'central tax', 'central gst', 'cgst'],
+        exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        multi: true,
+        weight: 3
+      },
+      sgst: {
+        aliases: ['sgst amount', 'sgst amt', 'sgst val', 'state tax', 'state gst', 'sgst/utgst', 'utgst', 'sgst'],
+        exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        multi: true,
+        weight: 3
+      },
+      igst: {
+        aliases: ['igst amount', 'igst amt', 'igst val', 'integrated tax', 'integrated gst', 'igst'],
+        exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        multi: true,
+        weight: 3
+      },
+      total_tax: {
+        aliases: ['total tax', 'tax amount', 'gst amount', 'total gst', 'tax amt', 'total tax amount', 'vat/tax amount'],
+        exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'rate'],
+        multi: false,
+        weight: 2
+      },
+      total_val: {
+        aliases: ['total value', 'invoice value', 'total amount', 'inv value', 'grand total', 'gross total', 'bill amount', 'net total', 'doc value', 'total'],
+        exclusions: ['original', 'amended', 'tax', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate'],
+        multi: false,
+        weight: 2
+      },
+      branch: {
+        aliases: ['branch name', 'branch', 'plant', 'location', 'unit', 'business unit', 'profit center'],
+        exclusions: ['code', 'id', 'sub'],
+        multi: false,
+        weight: 1
+      },
+      sap_trans_no: {
+        aliases: ['sap trans no', 'transaction number', 'trans no', 'trans #', 'voucher no', 'doc number', 'accounting doc', 'internal doc no'],
+        exclusions: ['original', 'date', 'type', 'vendor', 'rate'],
+        multi: false,
+        weight: 1
+      },
+      doc_type: {
+        aliases: ['document type', 'doc type', 'voucher type', 'vch type'],
+        exclusions: ['date', 'no', 'number'],
+        multi: false,
+        weight: 1
+      },
+      rcm: {
+        aliases: ['rcm applicable', 'reverse charge', 'rcm', 'rc'],
+        exclusions: ['diff'],
+        multi: false,
+        weight: 1
+      }
+    };
+
+    function detectSheetAndHeaders(workbook, isBooks) {
+      let bestSheet = workbook.SheetNames[0];
+      let bestHeaderRow = 0;
+      let bestMapping = {};
+      let bestRawHeaders = [];
+      let bestScore = -1;
+      const preferredKws = isBooks ? ['input', 'purchase', 'pr', 'tally', 'register', 'raw'] : ['portal', '2b', 'gstr2b', 'gstr-2b', 'purchase', 'b2b'];
+
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) continue;
+        const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: "" });
+        const maxScan = Math.min(matrix.length, 15);
+
+        for (let r = 0; r < maxScan; r++) {
+          const row = matrix[r] || [];
+          if (!row || row.length === 0) continue;
+          const cleanCells = row.map(c => String(c !== null && c !== undefined ? c : '').trim().toLowerCase());
+          if (!cleanCells.some(c => c !== '')) continue;
+
+          const mapping = {};
+          let score = 0;
+
+          for (const [field, defn] of Object.entries(FIELD_DEFINITIONS)) {
+            const found = [];
+            for (const alias of defn.aliases) {
+              for (let i = 0; i < cleanCells.length; i++) {
+                const cell = cleanCells[i];
+                if (!cell) continue;
+                if (defn.exclusions.some(ex => cell.includes(ex))) continue;
+
+                let match = false;
+                if (alias === cell) match = true;
+                else if (alias.includes(' ') && cell.includes(alias)) match = true;
+                else {
+                  try {
+                    const reg = new RegExp('\\b' + alias + '\\b');
+                    if (reg.test(cell)) match = true;
+                  } catch(e) {
+                    if (cell.includes(alias)) match = true;
+                  }
+                }
+
+                if (match && !found.includes(i)) {
+                  found.push(i);
+                  if (!defn.multi) break;
+                }
+              }
+              if (found.length > 0 && !defn.multi) break;
+            }
+
+            if (found.length > 0) {
+              mapping[field] = defn.multi ? found : found[0];
+              score += defn.weight;
+            }
+          }
+
+          let bonus = 0;
+          const sLower = sheetName.toLowerCase();
+          if (preferredKws.some(kw => sLower.includes(kw))) {
+            bonus += 5;
+          }
+
+          const totalScore = score + bonus;
+          if (totalScore > bestScore) {
+            bestScore = totalScore;
+            bestSheet = sheetName;
+            bestHeaderRow = r;
+            bestMapping = mapping;
+            bestRawHeaders = row.map(c => String(c !== null && c !== undefined ? c : '').trim());
+          }
+        }
+      }
+
+      return {
+        sheetName: bestSheet,
+        headerRow: bestHeaderRow,
+        mapping: bestMapping,
+        rawHeaders: bestRawHeaders,
+        score: bestScore
+      };
+    }
+
+    function parseRowsWithMapping(workbook, sheetName, headerRow, mapping, isBooks) {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) return [];
+      const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: "" });
+      const rows = [];
+
+      for (let i = headerRow + 1; i < matrix.length; i++) {
+        const r = matrix[i];
+        if (!r || r.length === 0) continue;
+
+        const gstin = cleanGstin(mapping.gstin !== undefined ? r[mapping.gstin] : "");
+        const rawBill = cleanStr(mapping.bill_no !== undefined ? r[mapping.bill_no] : "");
+
+        if (!gstin && !rawBill) continue;
+
+        const cgstCols = Array.isArray(mapping.cgst) ? mapping.cgst : (mapping.cgst !== undefined ? [mapping.cgst] : []);
+        const sgstCols = Array.isArray(mapping.sgst) ? mapping.sgst : (mapping.sgst !== undefined ? [mapping.sgst] : []);
+        const igstCols = Array.isArray(mapping.igst) ? mapping.igst : (mapping.igst !== undefined ? [mapping.igst] : []);
+
+        const cgst = Math.round(cgstCols.reduce((acc, c) => acc + safeFloat(r[c]), 0) * 100) / 100;
+        const sgst = Math.round(sgstCols.reduce((acc, c) => acc + safeFloat(r[c]), 0) * 100) / 100;
+        const igst = Math.round(igstCols.reduce((acc, c) => acc + safeFloat(r[c]), 0) * 100) / 100;
+        const taxable = safeFloat(mapping.taxable !== undefined ? r[mapping.taxable] : 0);
+
+        let totalTax = 0;
+        if (cgstCols.length > 0 || sgstCols.length > 0 || igstCols.length > 0) {
+          totalTax = Math.round((cgst + sgst + igst) * 100) / 100;
+        } else if (mapping.total_tax !== undefined) {
+          totalTax = safeFloat(r[mapping.total_tax]);
+        }
+
+        const totalVal = safeFloat(mapping.total_val !== undefined ? r[mapping.total_val] : 0);
+        const dateVal = cleanDateStr(mapping.inv_date !== undefined ? r[mapping.inv_date] : "");
+
+        if (isBooks) {
+          const branch = cleanStr(mapping.branch !== undefined ? r[mapping.branch] : "");
+          const transNo = cleanStr(mapping.sap_trans_no !== undefined ? r[mapping.sap_trans_no] : "");
+          const postDate = cleanDateStr(mapping.posting_date !== undefined ? r[mapping.posting_date] : "");
+          const vendorName = cleanStr(mapping.vendor_name !== undefined ? r[mapping.vendor_name] : "Vendor");
+
+          rows.push({
+            row_id: i,
+            branch: branch,
+            sap_trans_no: transNo,
+            posting_date: postDate,
+            inv_date: dateVal,
+            bill_no: rawBill,
+            clean_bill_no: cleanInvoiceNo(rawBill),
+            vendor_name: vendorName,
+            gstin: gstin,
+            taxable: taxable,
+            cgst: cgst,
+            sgst: sgst,
+            igst: igst,
+            total_tax: totalTax,
+            total_val: totalVal
+          });
+        } else {
+          const suppName = cleanStr(mapping.vendor_name !== undefined ? r[mapping.vendor_name] : "Vendor");
+          const rcm = cleanStr(mapping.rcm !== undefined ? r[mapping.rcm] : "N");
+
+          rows.push({
+            portal_id: i,
+            supplier_name: suppName,
+            gstin: gstin,
+            doc_no: rawBill,
+            clean_doc_no: cleanInvoiceNo(rawBill),
+            doc_date: dateVal,
+            doc_val: totalVal,
+            taxable: taxable,
+            cgst: cgst,
+            sgst: sgst,
+            igst: igst,
+            total_tax: totalTax,
+            rc: rcm
+          });
+        }
+      }
+
+      return rows;
+    }
+
+    function renderSchemaBadge(targetType, schemaInfo) {
+      const card = document.getElementById(targetType === 'books' ? 'booksSchemaCard' : 'portalSchemaCard');
+      const summary = document.getElementById(targetType === 'books' ? 'booksSchemaSummary' : 'portalSchemaSummary');
+      const pillsContainer = document.getElementById(targetType === 'books' ? 'booksSchemaPills' : 'portalSchemaPills');
+
+      if (!card || !summary || !pillsContainer) return;
+
+      summary.innerHTML = `Sheet: <b class="text-dark">${schemaInfo.sheetName}</b> | Header: <b class="text-dark">Row ${schemaInfo.headerRow + 1}</b> (Confidence Score: ${schemaInfo.score})`;
+
+      const m = schemaInfo.mapping;
+      const rh = schemaInfo.rawHeaders;
+      const pills = [];
+
+      if (m.gstin !== undefined) pills.push(`<span class="badge bg-secondary-subtle text-dark border">GSTIN: <b>${colLetter(m.gstin)}</b> (${rh[m.gstin] || ''})</span>`);
+      if (m.bill_no !== undefined) pills.push(`<span class="badge bg-secondary-subtle text-dark border">Bill/Doc: <b>${colLetter(m.bill_no)}</b> (${rh[m.bill_no] || ''})</span>`);
+      if (m.taxable !== undefined) pills.push(`<span class="badge bg-secondary-subtle text-dark border">Taxable: <b>${colLetter(m.taxable)}</b> (${rh[m.taxable] || ''})</span>`);
+
+      const cgstCols = Array.isArray(m.cgst) ? m.cgst : (m.cgst !== undefined ? [m.cgst] : []);
+      if (cgstCols.length > 0) pills.push(`<span class="badge bg-primary-subtle text-primary border">CGST: <b>${cgstCols.map(c => colLetter(c)).join(',')}</b></span>`);
+
+      const sgstCols = Array.isArray(m.sgst) ? m.sgst : (m.sgst !== undefined ? [m.sgst] : []);
+      if (sgstCols.length > 0) pills.push(`<span class="badge bg-info-subtle text-info border">SGST: <b>${sgstCols.map(c => colLetter(c)).join(',')}</b></span>`);
+
+      const igstCols = Array.isArray(m.igst) ? m.igst : (m.igst !== undefined ? [m.igst] : []);
+      if (igstCols.length > 0) pills.push(`<span class="badge bg-warning-subtle text-dark border">IGST: <b>${igstCols.map(c => colLetter(c)).join(',')}</b></span>`);
+
+      if (targetType === 'books' && m.branch !== undefined) pills.push(`<span class="badge bg-success-subtle text-success border">Branch: <b>${colLetter(m.branch)}</b> (${rh[m.branch] || ''})</span>`);
+
+      pillsContainer.innerHTML = pills.join(' ');
+      card.classList.remove('d-none');
+    }
+
+    // -------------------------------------------------------------
+    // FILE HANDLERS
     // -------------------------------------------------------------
     function handlePortalFile(file) {
       if (!file) return;
-      showLoading("Reading GST Portal File: " + file.name + " ...");
+      showLoading("Auto-detecting GST Portal format: " + file.name + " ...");
 
       const reader = new FileReader();
       reader.onload = function(e) {
         try {
           const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          let targetSheet = workbook.SheetNames[0];
-          for (let name of ['Bangalore IOT Portal', 'Purchase', 'Overview', 'Sheet1']) {
-            if (workbook.SheetNames.includes(name)) { targetSheet = name; break; }
-          }
-          const sheet = workbook.Sheets[targetSheet];
-          const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          currentPortalWorkbook = XLSX.read(data, { type: 'array' });
 
-          rawPortalRows = parsePortalRows(jsonRows);
+          portalSchemaInfo = detectSheetAndHeaders(currentPortalWorkbook, false);
+          rawPortalRows = parseRowsWithMapping(currentPortalWorkbook, portalSchemaInfo.sheetName, portalSchemaInfo.headerRow, portalSchemaInfo.mapping, false);
           hideLoading();
+
+          renderSchemaBadge('portal', portalSchemaInfo);
 
           document.getElementById('portalDropBox').classList.add('has-file');
           document.getElementById('portalFileInfo').classList.remove('d-none');
@@ -672,65 +1139,21 @@
       reader.readAsArrayBuffer(file);
     }
 
-    function parsePortalRows(rows) {
-      if (!rows || rows.length === 0) return [];
-      const colMap = {};
-      const sample = rows[0];
-      Object.keys(sample).forEach(key => {
-        const k = key.trim().toLowerCase();
-        if (k.includes('gstin') || k.includes('supplier gstin')) colMap.gstin = key;
-        else if (k.includes('doc no') || k.includes('invoice no') || k.includes('doc_no')) colMap.doc_no = key;
-        else if (k.includes('supplier name') || k.includes('trade name') || k.includes('name')) colMap.name = key;
-        else if (k.includes('doc date') || k.includes('invoice date') || k.includes('date')) colMap.date = key;
-        else if (k.includes('item taxable') || k.includes('taxable value') || k.includes('taxable')) colMap.taxable = key;
-        else if (k === 'igst') colMap.igst = key;
-        else if (k === 'cgst') colMap.cgst = key;
-        else if (k === 'sgst') colMap.sgst = key;
-      });
-
-      return rows.map((r, i) => {
-        const gstin = cleanGstin(r[colMap.gstin] || r['Supplier GSTIN'] || r['GSTIN']);
-        const doc_no = String(r[colMap.doc_no] || r['Doc No'] || r['Invoice No'] || '').trim();
-        const taxable = safeFloat(r[colMap.taxable] || r['Taxable Value'] || r['Item Taxable Value']);
-        const igst = safeFloat(r[colMap.igst] || r['IGST']);
-        const cgst = safeFloat(r[colMap.cgst] || r['CGST']);
-        const sgst = safeFloat(r[colMap.sgst] || r['SGST']);
-        return {
-          portal_id: i + 1,
-          gstin: gstin,
-          supplier_name: String(r[colMap.name] || r['Supplier Name'] || 'Vendor').trim(),
-          doc_no: doc_no,
-          clean_doc_no: cleanInvoiceNo(doc_no),
-          doc_date: String(r[colMap.date] || r['Doc Date'] || r['Invoice Date'] || '').slice(0, 10),
-          taxable: taxable,
-          igst: igst,
-          cgst: cgst,
-          sgst: sgst,
-          total_tax: Math.round((igst + cgst + sgst) * 100) / 100
-        };
-      }).filter(r => r.gstin);
-    }
-
     function handleBooksFile(file) {
       if (!file) return;
-      showLoading("Reading SAP Books File: " + file.name + " ...");
+      showLoading("Auto-detecting Books / Purchase Register format: " + file.name + " ...");
 
       const reader = new FileReader();
       reader.onload = function(e) {
         try {
           const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          let targetSheet = workbook.SheetNames[0];
-          if (workbook.SheetNames.includes('Input')) targetSheet = 'Input';
-          else if (workbook.SheetNames.includes('Sheet1')) targetSheet = 'Sheet1';
-          
-          const sheet = workbook.Sheets[targetSheet];
-          const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          currentBooksWorkbook = XLSX.read(data, { type: 'array' });
 
-          rawBooksRows = parseBooksRows(jsonRows);
+          booksSchemaInfo = detectSheetAndHeaders(currentBooksWorkbook, true);
+          rawBooksRows = parseRowsWithMapping(currentBooksWorkbook, booksSchemaInfo.sheetName, booksSchemaInfo.headerRow, booksSchemaInfo.mapping, true);
           hideLoading();
 
+          renderSchemaBadge('books', booksSchemaInfo);
           populateBranchDropdown(rawBooksRows);
 
           document.getElementById('booksDropBox').classList.add('has-file');
@@ -748,47 +1171,206 @@
       reader.readAsArrayBuffer(file);
     }
 
-    function parseBooksRows(rows) {
-      if (!rows || rows.length === 0) return [];
-      const colMap = {};
-      const sample = rows[0];
-      Object.keys(sample).forEach(key => {
-        const k = key.trim().toLowerCase();
-        if (k === 'gst' || k.includes('vendor gst') || k.includes('gstin')) colMap.gstin = key;
-        else if (k.includes('vendor bill no') || k.includes('bill no') || k.includes('invoice no')) colMap.bill_no = key;
-        else if (k.includes('vendor name') || k.includes('name')) colMap.name = key;
-        else if (k.includes('branch name') || k.includes('branch')) colMap.branch = key;
-        else if (k.includes('invoice date') || k.includes('posting date') || k.includes('date')) colMap.date = key;
-        else if (k.includes('sap trans no') || k.includes('transaction number')) colMap.trans_no = key;
-        else if (k.includes('taxable value') || k.includes('taxable')) colMap.taxable = key;
-        else if (k === 'igst') colMap.igst = key;
-        else if (k === 'cgst') colMap.cgst = key;
-        else if (k === 'sgst') colMap.sgst = key;
+    // -------------------------------------------------------------
+    // MODAL REVIEW & CUSTOM COLUMN MAPPING CONFIGURATION
+    // -------------------------------------------------------------
+    function openMappingModal(targetType) {
+      activeModalTarget = targetType;
+      const wb = (targetType === 'books') ? currentBooksWorkbook : currentPortalWorkbook;
+      const schema = (targetType === 'books') ? booksSchemaInfo : portalSchemaInfo;
+
+      if (!wb || !schema) {
+        alert("Please upload the file first before editing column mappings.");
+        return;
+      }
+
+      document.getElementById('modalTargetLabel').innerText = (targetType === 'books') ? 'SAP Books (Purchase Register)' : 'GST Portal (GSTR-2B)';
+      document.getElementById('modalScoreBadge').innerText = `Detection Score: ${schema.score}`;
+
+      // Toggle Books specific controls
+      const isBooks = (targetType === 'books');
+      document.getElementById('divModalBranch').style.display = isBooks ? 'block' : 'none';
+      document.getElementById('divModalTransNo').style.display = isBooks ? 'block' : 'none';
+      document.getElementById('divModalPostDate').style.display = isBooks ? 'block' : 'none';
+      document.getElementById('thPreviewBranch').style.display = isBooks ? 'table-cell' : 'none';
+
+      // Populate Sheet Dropdown
+      const sheetSelect = document.getElementById('modalSelectSheet');
+      sheetSelect.innerHTML = '';
+      wb.SheetNames.forEach(sName => {
+        const opt = document.createElement('option');
+        opt.value = sName;
+        opt.innerText = sName;
+        if (sName === schema.sheetName) opt.selected = true;
+        sheetSelect.appendChild(opt);
       });
 
-      return rows.map((r, i) => {
-        const gstin = cleanGstin(r[colMap.gstin] || r['GST'] || r['GSTIN']);
-        const bill_no = String(r[colMap.bill_no] || r['Vendor Bill No.'] || r['Bill No'] || '').trim();
-        const taxable = safeFloat(r[colMap.taxable] || r['Taxable Value']);
-        const igst = safeFloat(r[colMap.igst] || r['IGST']);
-        const cgst = safeFloat(r[colMap.cgst] || r['CGST']);
-        const sgst = safeFloat(r[colMap.sgst] || r['SGST']);
-        return {
-          row_id: i + 1,
-          branch: String(r[colMap.branch] || r['Branch Name'] || '').trim(),
-          sap_trans_no: String(r[colMap.trans_no] || r['SAP Trans No'] || r['Transaction Number'] || '').trim(),
-          inv_date: String(r[colMap.date] || r['Invoice Date'] || '').slice(0, 10),
-          bill_no: bill_no,
-          clean_bill_no: cleanInvoiceNo(bill_no),
-          vendor_name: String(r[colMap.name] || r['Vendor Name'] || 'Vendor').trim(),
-          gstin: gstin,
-          taxable: taxable,
-          igst: igst,
-          cgst: cgst,
-          sgst: sgst,
-          total_tax: Math.round((igst + cgst + sgst) * 100) / 100
-        };
-      }).filter(r => r.gstin);
+      // Populate Header Row
+      document.getElementById('modalInputHeaderRow').value = schema.headerRow + 1;
+
+      // Populate Column Selects
+      populateModalColumnSelects(wb, schema.sheetName, schema.headerRow, schema.mapping);
+      updateModalPreview();
+
+      const modalElem = document.getElementById('columnMappingModal');
+      const bsModal = new bootstrap.Modal(modalElem);
+      bsModal.show();
+    }
+
+    function populateModalColumnSelects(wb, sheetName, headerRow, mapping) {
+      const sheet = wb.Sheets[sheetName];
+      if (!sheet) return;
+      const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: "" });
+      const row = matrix[headerRow] || [];
+
+      const fields = [
+        'gstin', 'bill_no', 'taxable', 'cgst', 'sgst', 'igst',
+        'inv_date', 'vendor_name', 'branch', 'total_val', 'sap_trans_no', 'posting_date'
+      ];
+
+      fields.forEach(f => {
+        const sel = document.getElementById('map_' + f);
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- None / Auto --</option>';
+
+        row.forEach((cellVal, idx) => {
+          const colName = String(cellVal !== null && cellVal !== undefined ? cellVal : '').trim();
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.innerText = `Col ${colLetter(idx)}: ${colName || '[Blank]'}`;
+          sel.appendChild(opt);
+        });
+
+        // Set selected
+        const currentVal = mapping[f];
+        if (Array.isArray(currentVal)) {
+          Array.from(sel.options).forEach(opt => {
+            if (currentVal.includes(parseInt(opt.value))) opt.selected = true;
+          });
+        } else if (currentVal !== undefined && currentVal !== null) {
+          sel.value = currentVal;
+        }
+      });
+    }
+
+    function onModalSheetChange() {
+      const wb = (activeModalTarget === 'books') ? currentBooksWorkbook : currentPortalWorkbook;
+      const sheetName = document.getElementById('modalSelectSheet').value;
+      const hRow = parseInt(document.getElementById('modalInputHeaderRow').value || 1) - 1;
+
+      // Re-detect on newly selected sheet
+      const tempSchema = detectSheetAndHeaders(wb, activeModalTarget === 'books');
+      tempSchema.sheetName = sheetName;
+      tempSchema.headerRow = hRow;
+      populateModalColumnSelects(wb, sheetName, hRow, tempSchema.mapping);
+      updateModalPreview();
+    }
+
+    function onModalHeaderChange() {
+      const wb = (activeModalTarget === 'books') ? currentBooksWorkbook : currentPortalWorkbook;
+      const sheetName = document.getElementById('modalSelectSheet').value;
+      const hRow = Math.max(0, parseInt(document.getElementById('modalInputHeaderRow').value || 1) - 1);
+      const curMap = readModalMapping();
+      populateModalColumnSelects(wb, sheetName, hRow, curMap);
+      updateModalPreview();
+    }
+
+    function readModalMapping() {
+      const map = {};
+      const fields = ['gstin', 'bill_no', 'taxable', 'inv_date', 'vendor_name', 'branch', 'total_val', 'sap_trans_no', 'posting_date'];
+      fields.forEach(f => {
+        const val = document.getElementById('map_' + f)?.value;
+        if (val !== "" && val !== undefined) map[f] = parseInt(val);
+      });
+
+      ['cgst', 'sgst', 'igst'].forEach(f => {
+        const sel = document.getElementById('map_' + f);
+        if (sel) {
+          const selected = Array.from(sel.selectedOptions).map(o => parseInt(o.value)).filter(v => !isNaN(v));
+          if (selected.length > 0) map[f] = selected;
+        }
+      });
+      return map;
+    }
+
+    function updateModalPreview() {
+      const wb = (activeModalTarget === 'books') ? currentBooksWorkbook : currentPortalWorkbook;
+      const sheetName = document.getElementById('modalSelectSheet').value;
+      const hRow = Math.max(0, parseInt(document.getElementById('modalInputHeaderRow').value || 1) - 1);
+      const mapping = readModalMapping();
+      const isBooks = (activeModalTarget === 'books');
+
+      const tbody = document.getElementById('modalPreviewTableBody');
+      const sampleRows = parseRowsWithMapping(wb, sheetName, hRow, mapping, isBooks).slice(0, 3);
+
+      if (sampleRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-2 text-warning">No data records found under current mapping. Please verify GSTIN / Bill No columns.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      sampleRows.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td class="font-monospace">${r.gstin || '-'}</td>
+          <td class="font-monospace fw-bold">${(isBooks ? r.bill_no : r.doc_no) || '-'}</td>
+          <td>${(isBooks ? r.vendor_name : r.supplier_name) || '-'}</td>
+          <td>${(isBooks ? r.inv_date : r.doc_date) || '-'}</td>
+          <td class="text-end font-monospace">${formatCurrency(r.taxable)}</td>
+          <td class="text-end font-monospace">${formatCurrency(r.cgst)}</td>
+          <td class="text-end font-monospace">${formatCurrency(r.sgst)}</td>
+          <td class="text-end font-monospace">${formatCurrency(r.igst)}</td>
+          <td class="text-end font-monospace fw-bold">${formatCurrency(r.total_tax)}</td>
+          ${isBooks ? `<td>${r.branch || '-'}</td>` : ''}
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function applyCustomMapping() {
+      const wb = (activeModalTarget === 'books') ? currentBooksWorkbook : currentPortalWorkbook;
+      const sheetName = document.getElementById('modalSelectSheet').value;
+      const hRow = Math.max(0, parseInt(document.getElementById('modalInputHeaderRow').value || 1) - 1);
+      const mapping = readModalMapping();
+      const isBooks = (activeModalTarget === 'books');
+
+      if (mapping.gstin === undefined || mapping.bill_no === undefined) {
+        alert("Please ensure both 'Supplier GSTIN' and 'Invoice / Bill No' columns are mapped.");
+        return;
+      }
+
+      const sheet = wb.Sheets[sheetName];
+      const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: "" });
+      const rawHeaders = (matrix[hRow] || []).map(c => String(c !== null && c !== undefined ? c : '').trim());
+
+      const updatedSchema = {
+        sheetName: sheetName,
+        headerRow: hRow,
+        mapping: mapping,
+        rawHeaders: rawHeaders,
+        score: 100 // Custom confirmed
+      };
+
+      if (isBooks) {
+        booksSchemaInfo = updatedSchema;
+        rawBooksRows = parseRowsWithMapping(wb, sheetName, hRow, mapping, true);
+        renderSchemaBadge('books', booksSchemaInfo);
+        populateBranchDropdown(rawBooksRows);
+        document.getElementById('booksRowCount').innerText = rawBooksRows.length;
+      } else {
+        portalSchemaInfo = updatedSchema;
+        rawPortalRows = parseRowsWithMapping(wb, sheetName, hRow, mapping, false);
+        renderSchemaBadge('portal', portalSchemaInfo);
+        document.getElementById('portalRowCount').innerText = rawPortalRows.length;
+      }
+
+      const modalElem = document.getElementById('columnMappingModal');
+      const bsModal = bootstrap.Modal.getInstance(modalElem);
+      if (bsModal) bsModal.hide();
+
+      checkReadyToReconcile();
+      alert(`Applied custom column mapping for ${(isBooks ? 'Books' : 'Portal')}! Parsed ${(isBooks ? rawBooksRows.length : rawPortalRows.length)} records.`);
     }
 
     function populateBranchDropdown(booksRows) {
