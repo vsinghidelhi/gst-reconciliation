@@ -139,7 +139,9 @@ function diagnoseSmartMatch(bBill, pDoc, bClean, pClean, bDate, pDate) {
 // -------------------------------------------------------------
 
 function runReconciliation(booksRows, portalRows, tolerance) {
-  if (!tolerance) tolerance = 2.0;
+  if (tolerance === undefined || tolerance === null || isNaN(tolerance)) {
+    tolerance = 2.0;
+  }
 
   // ---------------------------------------------------------
   // CHECK 1: VENDOR GSTIN PIVOT (MACRO CHECK WITH 3 HEADS)
@@ -215,16 +217,13 @@ function runReconciliation(booksRows, portalRows, tolerance) {
     var cgstDiff = Math.round((bCgst - pCgst) * 100) / 100;
     var sgstDiff = Math.round((bSgst - pSgst) * 100) / 100;
 
-    var maxCount = Math.max(bInfo.count, pInfo.count);
-    var dynamicTol = Math.max(tolerance, Math.round(maxCount * 0.75 * 100) / 100);
+    var dynamicTol = (tolerance === 0) ? 0 : tolerance;
 
     var status = "";
     if (booksVendorAgg[gst] && portalVendorAgg[gst]) {
       var headsMatch = (Math.abs(igstDiff) <= dynamicTol && Math.abs(cgstDiff) <= dynamicTol && Math.abs(sgstDiff) <= dynamicTol);
       if (Math.abs(taxDiff) <= tolerance && headsMatch) {
         status = "100% Matched";
-      } else if (Math.abs(taxDiff) <= dynamicTol && headsMatch) {
-        status = "100% Matched (Round-off)";
       } else if (Math.abs(taxDiff) <= dynamicTol && !headsMatch) {
         status = "Tax Head Mismatch (IGST vs CGST/SGST)";
       } else {
@@ -269,14 +268,21 @@ function runReconciliation(booksRows, portalRows, tolerance) {
     var g = cleanGstin(b.gstin);
     var cInv = cleanInvoiceNo(b.bill_no);
     var key = g + "||" + cInv;
+    if (!cInv || cInv === "0") {
+      var docRef = b.sap_trans_no || b.trans_no || ("ROW_" + i);
+      key = g + "||DOC_" + docRef;
+    }
 
     if (!booksByKey[key]) {
       booksByKey[key] = {
-        gstin: g,
+        branch: b.branch || "",
+        sap_trans_no: b.sap_trans_no || b.trans_no || "",
+        inv_date: b.inv_date || "",
         bill_no: b.bill_no || "",
         clean_bill_no: cInv,
-        inv_date: b.inv_date || "",
         vendor_name: b.vendor_name || "",
+        gstin: g,
+        line_count: 0,
         taxable: 0.0,
         total_tax: 0.0,
         igst: 0.0,
@@ -285,11 +291,12 @@ function runReconciliation(booksRows, portalRows, tolerance) {
         row_indices: []
       };
     }
-    booksByKey[key].taxable += safeFloat(b.taxable);
-    booksByKey[key].total_tax += safeFloat(b.total_tax);
-    booksByKey[key].igst += safeFloat(b.igst);
-    booksByKey[key].cgst += safeFloat(b.cgst);
-    booksByKey[key].sgst += safeFloat(b.sgst);
+    booksByKey[key].line_count += 1;
+    booksByKey[key].taxable = Math.round((booksByKey[key].taxable + safeFloat(b.taxable)) * 100) / 100;
+    booksByKey[key].total_tax = Math.round((booksByKey[key].total_tax + safeFloat(b.total_tax)) * 100) / 100;
+    booksByKey[key].igst = Math.round((booksByKey[key].igst + safeFloat(b.igst)) * 100) / 100;
+    booksByKey[key].cgst = Math.round((booksByKey[key].cgst + safeFloat(b.cgst)) * 100) / 100;
+    booksByKey[key].sgst = Math.round((booksByKey[key].sgst + safeFloat(b.sgst)) * 100) / 100;
     booksByKey[key].row_indices.push(i);
   }
 
@@ -368,7 +375,8 @@ function runReconciliation(booksRows, portalRows, tolerance) {
         var isMatch = diag.match;
         var reason = diag.reason;
 
-        if (!isMatch && (!cBill || cBill === "0")) {
+        var isBlankBill = (!cBill || cBill === "0" || (cBill + "").indexOf("DOC_") === 0);
+        if (!isMatch && isBlankBill) {
           var sameTaxCount = 0;
           for (var ci = 0; ci < candidates.length; ci++) {
             if (Math.abs(safeFloat(portalRows[candidates[ci]].total_tax) - bAgg.total_tax) <= tolerance) sameTaxCount++;
@@ -400,23 +408,26 @@ function runReconciliation(booksRows, portalRows, tolerance) {
   }
 
   // ---------------------------------------------------------
-  // BUILD SIDE-BY-SIDE RECONCILIATION TABLES
+  // BUILD SIDE-BY-SIDE RECONCILIATION TABLES (1 Row per Invoice)
   // ---------------------------------------------------------
   var booksVsPortal = [];
   var actionableList = [];
 
-  for (var i = 0; i < booksRows.length; i++) {
-    var b = booksRows[i];
-    var key = cleanGstin(b.gstin) + "||" + cleanInvoiceNo(b.bill_no);
-    var bAgg = booksByKey[key] || b;
+  for (var key in booksByKey) {
+    var b = booksByKey[key];
+    var transDisplay = b.sap_trans_no || "";
+    if (b.line_count > 1) {
+      transDisplay = (transDisplay ? transDisplay + " " : "") + "(" + b.line_count + " items)";
+    }
 
     var bRecon = {
       branch: b.branch || "",
-      sap_trans_no: b.sap_trans_no || b.trans_no || "",
+      sap_trans_no: transDisplay,
       inv_date: b.inv_date || "",
       bill_no: b.bill_no || "",
       vendor_name: b.vendor_name || "",
-      gstin: cleanGstin(b.gstin),
+      gstin: b.gstin,
+      line_count: b.line_count,
       taxable: safeFloat(b.taxable),
       igst: safeFloat(b.igst),
       cgst: safeFloat(b.cgst),
@@ -435,7 +446,7 @@ function runReconciliation(booksRows, portalRows, tolerance) {
       portal_tax: 0.0,
       tax_diff: safeFloat(b.total_tax),
       match_status: "Only in Books (Missing in 2B)",
-      match_reason: "Vendor has not filed invoice in GSTR-1 or GSTIN mismatch"
+      match_reason: "Vendor has not filed invoice in GSTR-1 or GSTIN mismatch" + (b.line_count > 1 ? " (" + b.line_count + " items)" : "")
     };
 
     if (matchedBooksKeys[key]) {
@@ -452,9 +463,13 @@ function runReconciliation(booksRows, portalRows, tolerance) {
       bRecon.portal_sgst = safeFloat(pRow.sgst);
       bRecon.sgst_diff = Math.round((safeFloat(b.sgst) - safeFloat(pRow.sgst)) * 100) / 100;
       bRecon.portal_tax = safeFloat(pRow.total_tax);
-      bRecon.tax_diff = Math.round((bAgg.total_tax - safeFloat(pRow.total_tax)) * 100) / 100;
+      bRecon.tax_diff = Math.round((b.total_tax - safeFloat(pRow.total_tax)) * 100) / 100;
       bRecon.match_status = matchInfo.status;
-      bRecon.match_reason = matchInfo.reason;
+      if (b.line_count > 1) {
+        bRecon.match_reason = matchInfo.reason + " (Consolidated " + b.line_count + " line items in Books)";
+      } else {
+        bRecon.match_reason = matchInfo.reason;
+      }
     }
 
     booksVsPortal.push(bRecon);
