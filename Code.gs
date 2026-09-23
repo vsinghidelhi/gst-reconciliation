@@ -222,10 +222,14 @@ function runReconciliation(booksRows, portalRows, tolerance) {
     var status = "";
     if (booksVendorAgg[gst] && portalVendorAgg[gst]) {
       var headsMatch = (Math.abs(igstDiff) <= dynamicTol && Math.abs(cgstDiff) <= dynamicTol && Math.abs(sgstDiff) <= dynamicTol);
-      if (Math.abs(taxDiff) <= tolerance && headsMatch) {
+      var taxableDiff = Math.round((bInfo.taxable - pInfo.taxable) * 100) / 100;
+      var taxableMatch = (Math.abs(taxableDiff) <= dynamicTol);
+      if (Math.abs(taxDiff) <= tolerance && headsMatch && taxableMatch) {
         status = "100% Matched";
       } else if (Math.abs(taxDiff) <= dynamicTol && !headsMatch) {
         status = "Tax Head Mismatch (IGST vs CGST/SGST)";
+      } else if (!taxableMatch) {
+        status = "Taxable Variance";
       } else {
         status = "Tax Variance";
       }
@@ -253,7 +257,7 @@ function runReconciliation(booksRows, portalRows, tolerance) {
       sgst_diff: sgstDiff,
       books_taxable: Math.round(bInfo.taxable * 100) / 100,
       portal_taxable: Math.round(pInfo.taxable * 100) / 100,
-      taxable_variance: Math.round((bInfo.taxable - pInfo.taxable) * 100) / 100,
+      taxable_variance: taxableDiff,
       books_inv_count: bInfo.count,
       portal_inv_count: pInfo.count
     });
@@ -323,20 +327,24 @@ function runReconciliation(booksRows, portalRows, tolerance) {
       var pRow = portalRows[pIdx];
       var bAgg = booksByKey[key];
 
+      var diffTaxable = Math.round(Math.abs(bAgg.taxable - safeFloat(pRow.taxable)) * 100) / 100;
       var diffTot = Math.round(Math.abs(bAgg.total_tax - safeFloat(pRow.total_tax)) * 100) / 100;
       var diffIgst = Math.round(Math.abs(bAgg.igst - safeFloat(pRow.igst)) * 100) / 100;
       var diffCgst = Math.round(Math.abs(bAgg.cgst - safeFloat(pRow.cgst)) * 100) / 100;
       var diffSgst = Math.round(Math.abs(bAgg.sgst - safeFloat(pRow.sgst)) * 100) / 100;
 
       var st = "", rsn = "";
-      if (diffTot <= tolerance) {
+      if (diffTaxable <= tolerance && diffTot <= tolerance) {
         if (diffIgst <= tolerance && diffCgst <= tolerance && diffSgst <= tolerance) {
           st = "Matched (Exact)";
-          rsn = "Exact Match: Invoice No & All Tax Heads (IGST/CGST/SGST)";
+          rsn = "Exact Match: Invoice No, Taxable Value & All Tax Heads (IGST/CGST/SGST)";
         } else {
           st = "Tax Head Mismatch (IGST vs CGST/SGST)";
           rsn = "Total Tax matches, but Head Mismatch: Books(I:" + bAgg.igst + ", C:" + bAgg.cgst + ", S:" + bAgg.sgst + ") vs Portal(I:" + pRow.igst + ", C:" + pRow.cgst + ", S:" + pRow.sgst + ")";
         }
+      } else if (diffTot <= tolerance && diffTaxable > tolerance) {
+        st = "Value Mismatch";
+        rsn = "Tax matches, but Taxable Value difference is ₹" + diffTaxable.toFixed(2) + " (Books: ₹" + bAgg.taxable.toFixed(2) + ", Portal: ₹" + safeFloat(pRow.taxable).toFixed(2) + ")";
       } else {
         st = "Value Mismatch";
         rsn = "Invoice matches, but Tax difference is ₹" + diffTot.toFixed(2);
@@ -365,12 +373,13 @@ function runReconciliation(booksRows, portalRows, tolerance) {
       if (matchedPortalIndices[pIdx]) continue;
       var pRow = portalRows[pIdx];
 
+      var diffTaxable = Math.round(Math.abs(bAgg.taxable - safeFloat(pRow.taxable)) * 100) / 100;
       var diffTot = Math.round(Math.abs(bAgg.total_tax - safeFloat(pRow.total_tax)) * 100) / 100;
       var diffIgst = Math.round(Math.abs(bAgg.igst - safeFloat(pRow.igst)) * 100) / 100;
       var diffCgst = Math.round(Math.abs(bAgg.cgst - safeFloat(pRow.cgst)) * 100) / 100;
       var diffSgst = Math.round(Math.abs(bAgg.sgst - safeFloat(pRow.sgst)) * 100) / 100;
 
-      if (diffTot <= tolerance) {
+      if (diffTot <= tolerance && diffTaxable <= tolerance) {
         var diag = diagnoseSmartMatch(bAgg.bill_no, pRow.doc_no, cBill, cleanInvoiceNo(pRow.doc_no), bAgg.inv_date, pRow.doc_date);
         var isMatch = diag.match;
         var reason = diag.reason;
@@ -379,7 +388,8 @@ function runReconciliation(booksRows, portalRows, tolerance) {
         if (!isMatch && isBlankBill) {
           var sameTaxCount = 0;
           for (var ci = 0; ci < candidates.length; ci++) {
-            if (Math.abs(safeFloat(portalRows[candidates[ci]].total_tax) - bAgg.total_tax) <= tolerance) sameTaxCount++;
+            var candP = portalRows[candidates[ci]];
+            if (Math.abs(safeFloat(candP.total_tax) - bAgg.total_tax) <= tolerance && Math.abs(safeFloat(candP.taxable) - bAgg.taxable) <= tolerance) sameTaxCount++;
           }
           if (sameTaxCount === 1) {
             isMatch = true;
