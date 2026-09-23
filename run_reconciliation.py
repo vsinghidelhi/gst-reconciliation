@@ -55,7 +55,12 @@ def main():
 
     # 3. Export Excel Report
     print(f"[4] Exporting formatted reconciliation report...")
-    export_reconciliation_workbook(reconciler, output_report)
+    try:
+        export_reconciliation_workbook(reconciler, output_report)
+    except PermissionError:
+        output_report = r"C:\Users\lenovo\Downloads\Bangalore_IOT_GST_Reconciliation_Report_Updated.xlsx"
+        print(f"[!] Target file was open in Excel. Saving to new path: {output_report}")
+        export_reconciliation_workbook(reconciler, output_report)
 
     # 4. Summary Output
     print("\n" + "=" * 70)
