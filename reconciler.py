@@ -63,6 +63,20 @@ def safe_float(val):
     except (ValueError, TypeError):
         return 0.0
 
+def clean_date(val):
+    if val is None or val == "":
+        return ""
+    if isinstance(val, (datetime, )):
+        return val.strftime('%Y-%m-%d')
+    s = str(val).strip()
+    if len(s) >= 10 and re.match(r'^\d{4}-\d{2}-\d{2}', s):
+        return s[:10]
+    m = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})', s)
+    if m:
+        d, mth, y = m.groups()
+        return f"{y}-{int(mth):02d}-{int(d):02d}"
+    return s[:10]
+
 def get_levenshtein_distance(s1, s2):
     if len(s1) < len(s2):
         return get_levenshtein_distance(s2, s1)
@@ -139,126 +153,371 @@ def diagnose_smart_match(b_bill, p_doc, b_clean, p_clean, b_date, p_date):
 
 
 # -------------------------------------------------------------
-# 2. DATA LOADERS
+# 2. DYNAMIC COLUMN DETECTION & DATA LOADERS
 # -------------------------------------------------------------
 
-def load_books_data(file_path, branch_filter=None):
+FIELD_DEFINITIONS = {
+    'gstin': {
+        'aliases': ['gstin/uin', 'supplier gstin', 'party gstin', 'vendor gstin', 'gstin', 'gst no', 'gst number', 'ctin', 'supplier gst', 'party gst', 'gst'],
+        'exclusions': ['original', 'amended', 'rate', 'code', 'diff', 'variance', 'cgst', 'sgst', 'igst', 'type', 'amount', 'amt', 'value', 'val', 'summary', 'pivot', '%'],
+        'multi': False,
+        'weight': 5
+    },
+    'bill_no': {
+        'aliases': ['vendor bill no', 'bill no', 'vendor doc no', 'invoice no', 'inv no', 'bill number', 'invoice number', 'voucher no', 'vch no', 'doc no', 'document no', 'ref no', 'reference no', 'supplier inv no', 'supplier invoice'],
+        'exclusions': ['original', 'amended', 'date', 'dt', 'rate', 'type', 'amount', 'amt', 'tax', 'total', 'value', 'val', 'diff', 'variance', 'code', '%'],
+        'multi': False,
+        'weight': 5
+    },
+    'inv_date': {
+        'aliases': ['invoice date', 'bill date', 'inv date', 'doc date', 'document date', 'vch date', 'voucher date', 'bill dt', 'inv dt', 'date'],
+        'exclusions': ['original', 'amended', 'posting', 'entry', 'create', 'creation', 'due', 'r1', 'filing', 'reconcile'],
+        'multi': False,
+        'weight': 2
+    },
+    'posting_date': {
+        'aliases': ['posting date', 'post date', 'entry date', 'creation date', 'create date', 'clearing date'],
+        'exclusions': ['original', 'invoice', 'inv', 'bill', 'doc date'],
+        'multi': False,
+        'weight': 1
+    },
+    'vendor_name': {
+        'aliases': ['vendor name', 'supplier name', 'party name', 'name of supplier', 'customer/vendor name', 'trade name', 'party', 'vendor', 'supplier'],
+        'exclusions': ['original', 'code', 'id', 'gst', 'pan', 'state', 'city', 'address', 'branch', 'type'],
+        'multi': False,
+        'weight': 2
+    },
+    'vendor_code': {
+        'aliases': ['customer/vendor code', 'vendor code', 'supplier code', 'party code', 'vendor id', 'supplier id', 'account code'],
+        'exclusions': ['original', 'name', 'gst', 'pan'],
+        'multi': False,
+        'weight': 1
+    },
+    'taxable': {
+        'aliases': ['taxable value', 'taxable amount', 'taxable val', 'item taxable value', 'taxable amt', 'assessable value', 'base amount', 'basic amount', 'net amount', 'taxable'],
+        'exclusions': ['original', 'amended', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate', '%', 'code', 'total'],
+        'multi': False,
+        'weight': 4
+    },
+    'cgst': {
+        'aliases': ['cgst amount', 'cgst amt', 'cgst val', 'central tax', 'central gst', 'cgst'],
+        'exclusions': ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        'multi': True,
+        'weight': 3
+    },
+    'sgst': {
+        'aliases': ['sgst amount', 'sgst amt', 'sgst val', 'state tax', 'state gst', 'sgst/utgst', 'utgst', 'sgst'],
+        'exclusions': ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        'multi': True,
+        'weight': 3
+    },
+    'igst': {
+        'aliases': ['igst amount', 'igst amt', 'igst val', 'integrated tax', 'integrated gst', 'igst'],
+        'exclusions': ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+        'multi': True,
+        'weight': 3
+    },
+    'total_tax': {
+        'aliases': ['total tax', 'tax amount', 'gst amount', 'total gst', 'tax amt', 'total tax amount', 'vat/tax amount'],
+        'exclusions': ['original', 'amended', 'diff', 'variance', 'status', 'rate'],
+        'multi': False,
+        'weight': 2
+    },
+    'total_val': {
+        'aliases': ['total value', 'invoice value', 'total amount', 'inv value', 'grand total', 'gross total', 'bill amount', 'net total', 'doc value', 'total'],
+        'exclusions': ['original', 'amended', 'tax', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate'],
+        'multi': False,
+        'weight': 2
+    },
+    'branch': {
+        'aliases': ['branch name', 'branch', 'plant', 'location', 'unit', 'business unit', 'profit center'],
+        'exclusions': ['code', 'id', 'sub'],
+        'multi': False,
+        'weight': 1
+    },
+    'sap_trans_no': {
+        'aliases': ['sap trans no', 'transaction number', 'trans no', 'trans #', 'voucher no', 'doc number', 'accounting doc', 'internal doc no'],
+        'exclusions': ['original', 'date', 'type', 'vendor', 'rate'],
+        'multi': False,
+        'weight': 1
+    },
+    'doc_type': {
+        'aliases': ['document type', 'doc type', 'voucher type', 'vch type'],
+        'exclusions': ['date', 'no', 'number'],
+        'multi': False,
+        'weight': 1
+    },
+    'rcm': {
+        'aliases': ['rcm applicable', 'reverse charge', 'rcm', 'rc'],
+        'exclusions': ['diff'],
+        'multi': False,
+        'weight': 1
+    }
+}
+
+def detect_sheet_and_columns(wb, preferred_sheet_keywords=None):
     """
-    Loads SAP PR GST Report (Books) from 'Input' sheet.
-    Filters by branch if branch_filter is provided (case-insensitive).
+    Intelligently identifies the data sheet, header row, and maps columns
+    based on comprehensive alias dictionaries, exclusions, and scoring.
+    Supports any ERP layout (SAP, Tally Prime, Zoho Books, Busy, etc.).
+    """
+    best_sheet = None
+    best_header_row = 0
+    best_mapping = {}
+    best_raw_headers = {}
+    best_score = -1
+
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        for row_idx, row in enumerate(sheet.iter_rows(values_only=True)):
+            if row_idx > 15:
+                break
+            clean_cells = [str(c).strip().lower() if c is not None else '' for c in row]
+            raw_cells = [str(c).strip() if c is not None else '' for c in row]
+            if not any(clean_cells):
+                continue
+
+            mapping = {}
+            raw_headers = {}
+            score = 0
+
+            for field, defn in FIELD_DEFINITIONS.items():
+                found_indices = []
+                for alias in defn['aliases']:
+                    for col_idx, cell_str in enumerate(clean_cells):
+                        if not cell_str:
+                            continue
+                        if any(ex in cell_str for ex in defn['exclusions']):
+                            continue
+                        match = False
+                        if alias == cell_str:
+                            match = True
+                        elif ' ' in alias and alias in cell_str:
+                            match = True
+                        elif re.search(r'\b' + re.escape(alias) + r'\b', cell_str):
+                            match = True
+
+                        if match and col_idx not in found_indices:
+                            found_indices.append(col_idx)
+                            if not defn['multi']:
+                                break
+                    if found_indices and not defn['multi']:
+                        break
+
+                if found_indices:
+                    if defn['multi']:
+                        mapping[field] = found_indices
+                        raw_headers[field] = [raw_cells[i] for i in found_indices]
+                    else:
+                        mapping[field] = found_indices[0]
+                        raw_headers[field] = raw_cells[found_indices[0]]
+                    score += defn['weight']
+
+            bonus = 0
+            s_lower = sheet_name.lower()
+            if preferred_sheet_keywords:
+                for kw in preferred_sheet_keywords:
+                    if kw in s_lower:
+                        bonus += 5
+                        break
+
+            total_score = score + bonus
+            if total_score > best_score:
+                best_score = total_score
+                best_sheet = sheet_name
+                best_header_row = row_idx
+                best_mapping = mapping
+                best_raw_headers = raw_headers
+
+    return best_sheet, best_header_row, best_mapping, best_raw_headers, best_score
+
+
+def load_books_data(file_path, branch_filter=None, sheet_name=None, header_row=None, custom_mapping=None):
+    """
+    Dynamically loads Purchase Register / Books data from any ERP format.
+    Automatically detects the sheet, header row, and column mapping.
+    Sums multi-tax rate columns (e.g. CGST 2.5%, 6%, 9%).
     """
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-    if 'Input' not in wb.sheetnames:
-        raise ValueError(f"Sheet 'Input' not found in Books file: {file_path}")
-    sheet = wb['Input']
+
+    if sheet_name and header_row is not None and custom_mapping:
+        target_sheet = sheet_name
+        h_row = header_row
+        mapping = custom_mapping
+        raw_headers = {}
+    else:
+        target_sheet, h_row, mapping, raw_headers, score = detect_sheet_and_columns(
+            wb, preferred_sheet_keywords=['input', 'purchase', 'pr', 'tally', 'register', 'raw']
+        )
+        if not target_sheet or 'gstin' not in mapping or 'bill_no' not in mapping:
+            wb.close()
+            raise ValueError(f"Failed to auto-detect required GST columns (GSTIN, Bill No) in Books file: {file_path}")
+
+    sheet = wb[target_sheet]
+
+    print(f"[*] Books Auto-Detection Engine:")
+    print(f"    - Target Sheet : '{target_sheet}' (Header Row: {h_row})")
+    print(f"    - GSTIN Col    : {mapping.get('gstin')} ('{raw_headers.get('gstin', '')}')")
+    print(f"    - Bill No Col  : {mapping.get('bill_no')} ('{raw_headers.get('bill_no', '')}')")
+    print(f"    - Taxable Col  : {mapping.get('taxable')} ('{raw_headers.get('taxable', '')}')")
+    print(f"    - CGST Col(s)  : {mapping.get('cgst')} ({raw_headers.get('cgst', [])})")
+    print(f"    - SGST Col(s)  : {mapping.get('sgst')} ({raw_headers.get('sgst', [])})")
+    print(f"    - IGST Col(s)  : {mapping.get('igst')} ({raw_headers.get('igst', [])})")
+    if 'branch' in mapping:
+        print(f"    - Branch Col   : {mapping.get('branch')} ('{raw_headers.get('branch', '')}')")
+
+    has_branch_col = 'branch' in mapping
+    gst_idx = mapping.get('gstin')
+    bill_idx = mapping.get('bill_no')
+    date_idx = mapping.get('inv_date')
+    post_date_idx = mapping.get('posting_date')
+    name_idx = mapping.get('vendor_name')
+    code_idx = mapping.get('vendor_code')
+    taxable_idx = mapping.get('taxable')
+    cgst_indices = mapping.get('cgst', [])
+    sgst_indices = mapping.get('sgst', [])
+    igst_indices = mapping.get('igst', [])
+    tot_tax_idx = mapping.get('total_tax')
+    tot_val_idx = mapping.get('total_val')
+    branch_idx = mapping.get('branch')
+    trans_idx = mapping.get('sap_trans_no')
+    doc_type_idx = mapping.get('doc_type')
+    rcm_idx = mapping.get('rcm')
 
     rows = []
     for i, r in enumerate(sheet.iter_rows(values_only=True)):
-        if i == 0:
-            continue
-        branch = clean_str(r[29])
-        if branch_filter and branch.lower() != branch_filter.lower():
+        if i <= h_row:
             continue
 
-        raw_bill_no = clean_str(r[8])
-        gstin = clean_gstin(r[11])
-        cgst = safe_float(r[24])
-        sgst = safe_float(r[25])
-        igst = safe_float(r[26])
-        taxable = safe_float(r[23])
-        total_val = safe_float(r[27])
+        branch = clean_str(r[branch_idx]) if (has_branch_col and branch_idx < len(r)) else ""
+        if branch_filter and has_branch_col and branch:
+            if branch.lower() != branch_filter.lower():
+                continue
+
+        raw_bill_no = clean_str(r[bill_idx]) if bill_idx is not None and bill_idx < len(r) else ""
+        gstin = clean_gstin(r[gst_idx]) if gst_idx is not None and gst_idx < len(r) else ""
+
+        # Skip rows where both bill no and gstin are missing
+        if not gstin and not raw_bill_no:
+            continue
+
+        cgst = round(sum(safe_float(r[c]) for c in cgst_indices if c < len(r)), 2)
+        sgst = round(sum(safe_float(r[s]) for s in sgst_indices if s < len(r)), 2)
+        igst = round(sum(safe_float(r[ig]) for ig in igst_indices if ig < len(r)), 2)
+        taxable = safe_float(r[taxable_idx]) if taxable_idx is not None and taxable_idx < len(r) else 0.0
+
+        if (not cgst_indices and not sgst_indices and not igst_indices) and tot_tax_idx is not None and tot_tax_idx < len(r):
+            total_tax = safe_float(r[tot_tax_idx])
+        else:
+            total_tax = round(cgst + sgst + igst, 2)
+
+        total_val = safe_float(r[tot_val_idx]) if tot_val_idx is not None and tot_val_idx < len(r) else 0.0
 
         row_dict = {
             'row_id': i,
-            'doc_type': clean_str(r[1]),
-            'trans_no': clean_str(r[2]),
-            'sap_trans_no': clean_str(r[3]),
-            'posting_date': clean_str(r[4])[:10] if r[4] else "",
-            'inv_date': clean_str(r[5])[:10] if r[5] else "",
+            'doc_type': clean_str(r[doc_type_idx]) if doc_type_idx is not None and doc_type_idx < len(r) else "",
+            'trans_no': clean_str(r[trans_idx]) if trans_idx is not None and trans_idx < len(r) else "",
+            'sap_trans_no': clean_str(r[trans_idx]) if trans_idx is not None and trans_idx < len(r) else "",
+            'posting_date': clean_date(r[post_date_idx]) if post_date_idx is not None and post_date_idx < len(r) else "",
+            'inv_date': clean_date(r[date_idx]) if date_idx is not None and date_idx < len(r) else "",
             'bill_no': raw_bill_no,
             'clean_bill_no': clean_invoice_no(raw_bill_no),
-            'vendor_code': clean_str(r[9]),
-            'vendor_name': clean_str(r[10]),
+            'vendor_code': clean_str(r[code_idx]) if code_idx is not None and code_idx < len(r) else "",
+            'vendor_name': clean_str(r[name_idx]) if name_idx is not None and name_idx < len(r) else "Vendor",
             'gstin': gstin,
-            'rcm': clean_str(r[12]),
+            'rcm': clean_str(r[rcm_idx]) if rcm_idx is not None and rcm_idx < len(r) else "",
             'taxable': taxable,
             'cgst': cgst,
             'sgst': sgst,
             'igst': igst,
-            'total_tax': round(cgst + sgst + igst, 2),
+            'total_tax': total_tax,
             'total_val': total_val,
             'branch': branch
         }
         rows.append(row_dict)
+
     wb.close()
+    if branch_filter and not has_branch_col:
+        print(f"    [!] Note: No branch column detected in Books file. Processed all {len(rows)} rows.")
     return rows
 
 
-def load_portal_data(file_path):
+def load_portal_data(file_path, sheet_name=None, header_row=None, custom_mapping=None):
     """
-    Loads GST Portal / GSTR-2B data.
-    Automatically detects column headers across different portal formats.
+    Dynamically loads GST Portal / GSTR-2B data from any layout.
+    Automatically detects the sheet, header row, and column mapping.
     """
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-    sheet_names = wb.sheetnames
 
-    target_sheet = None
-    for name in ['Bangalore IOT Portal', 'Purchase', 'Overview', 'Sheet1']:
-        if name in sheet_names:
-            target_sheet = name
-            break
-    if not target_sheet:
-        target_sheet = sheet_names[0]
+    if sheet_name and header_row is not None and custom_mapping:
+        target_sheet = sheet_name
+        h_row = header_row
+        mapping = custom_mapping
+        raw_headers = {}
+    else:
+        target_sheet, h_row, mapping, raw_headers, score = detect_sheet_and_columns(
+            wb, preferred_sheet_keywords=['portal', '2b', 'gstr2b', 'gstr-2b', 'purchase', 'b2b']
+        )
+        if not target_sheet or 'gstin' not in mapping or 'bill_no' not in mapping:
+            wb.close()
+            raise ValueError(f"Failed to auto-detect required GST columns in Portal file: {file_path}")
 
     sheet = wb[target_sheet]
+
+    print(f"[*] Portal Auto-Detection Engine:")
+    print(f"    - Target Sheet : '{target_sheet}' (Header Row: {h_row})")
+    print(f"    - GSTIN Col    : {mapping.get('gstin')} ('{raw_headers.get('gstin', '')}')")
+    print(f"    - Doc No Col   : {mapping.get('bill_no')} ('{raw_headers.get('bill_no', '')}')")
+    print(f"    - Taxable Col  : {mapping.get('taxable')} ('{raw_headers.get('taxable', '')}')")
+    print(f"    - CGST Col(s)  : {mapping.get('cgst')} ({raw_headers.get('cgst', [])})")
+    print(f"    - SGST Col(s)  : {mapping.get('sgst')} ({raw_headers.get('sgst', [])})")
+    print(f"    - IGST Col(s)  : {mapping.get('igst')} ({raw_headers.get('igst', [])})")
+
+    gst_idx = mapping.get('gstin')
+    doc_idx = mapping.get('bill_no')
+    name_idx = mapping.get('vendor_name')
+    date_idx = mapping.get('inv_date')
+    taxable_idx = mapping.get('taxable')
+    cgst_indices = mapping.get('cgst', [])
+    sgst_indices = mapping.get('sgst', [])
+    igst_indices = mapping.get('igst', [])
+    tot_val_idx = mapping.get('total_val')
+    rc_idx = mapping.get('rcm')
+
     rows = []
-    col_idx = {}
-
     for i, r in enumerate(sheet.iter_rows(values_only=True)):
-        if i == 0:
-            for idx, col in enumerate(r):
-                if col is not None:
-                    col_idx[str(col).strip().lower()] = idx
+        if i <= h_row:
             continue
 
-        gst_idx = col_idx.get('gstin', col_idx.get('supplier gstin', 2))
-        inv_idx = col_idx.get('invoice no', col_idx.get('doc no', 5))
-        name_idx = col_idx.get('supplier name', 1)
-        date_idx = col_idx.get('invoice date', col_idx.get('doc date', 7))
-        taxable_idx = col_idx.get('taxable value', col_idx.get('item taxable value', 9))
-        igst_idx = col_idx.get('igst', 10)
-        cgst_idx = col_idx.get('cgst', 11)
-        sgst_idx = col_idx.get('sgst', 12)
-        val_idx = col_idx.get('invoice value', col_idx.get('doc value', 8))
-        rc_idx = col_idx.get('rc', col_idx.get('reverse charge', -1))
+        gstin = clean_gstin(r[gst_idx]) if gst_idx is not None and gst_idx < len(r) else ""
+        doc_no = clean_str(r[doc_idx]) if doc_idx is not None and doc_idx < len(r) else ""
 
-        gstin = clean_gstin(r[gst_idx]) if gst_idx < len(r) else ""
-        if not gstin and not any(r):
+        if not gstin and not doc_no:
             continue
 
-        bill_no = clean_str(r[inv_idx]) if inv_idx < len(r) else ""
-        cgst = safe_float(r[cgst_idx]) if cgst_idx < len(r) else 0.0
-        sgst = safe_float(r[sgst_idx]) if sgst_idx < len(r) else 0.0
-        igst = safe_float(r[igst_idx]) if igst_idx < len(r) else 0.0
-        taxable = safe_float(r[taxable_idx]) if taxable_idx < len(r) else 0.0
-        val = safe_float(r[val_idx]) if val_idx < len(r) else 0.0
+        cgst = round(sum(safe_float(r[c]) for c in cgst_indices if c < len(r)), 2)
+        sgst = round(sum(safe_float(r[s]) for s in sgst_indices if s < len(r)), 2)
+        igst = round(sum(safe_float(r[ig]) for ig in igst_indices if ig < len(r)), 2)
+        taxable = safe_float(r[taxable_idx]) if taxable_idx is not None and taxable_idx < len(r) else 0.0
+        val = safe_float(r[tot_val_idx]) if tot_val_idx is not None and tot_val_idx < len(r) else 0.0
 
         row_dict = {
             'portal_id': i,
-            'supplier_name': clean_str(r[name_idx]) if name_idx < len(r) else "",
+            'supplier_name': clean_str(r[name_idx]) if name_idx is not None and name_idx < len(r) else "Vendor",
             'gstin': gstin,
-            'doc_no': bill_no,
-            'clean_doc_no': clean_invoice_no(bill_no),
-            'doc_date': clean_str(r[date_idx])[:10] if date_idx < len(r) and r[date_idx] else "",
+            'doc_no': doc_no,
+            'clean_doc_no': clean_invoice_no(doc_no),
+            'doc_date': clean_date(r[date_idx]) if date_idx is not None and date_idx < len(r) else "",
             'doc_val': val,
             'taxable': taxable,
             'cgst': cgst,
             'sgst': sgst,
             'igst': igst,
             'total_tax': round(cgst + sgst + igst, 2),
-            'rc': clean_str(r[rc_idx]) if rc_idx != -1 and rc_idx < len(r) else "N"
+            'rc': clean_str(r[rc_idx]) if rc_idx is not None and rc_idx < len(r) else "N"
         }
         rows.append(row_dict)
+
     wb.close()
     return rows
 
