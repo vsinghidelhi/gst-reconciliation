@@ -841,7 +841,8 @@
         return;
       }
 
-      const tol = parseFloat(document.getElementById('numTolerance').value) || 2.0;
+      const rawTolInput = document.getElementById('numTolerance').value;
+      const tol = (rawTolInput === '' || isNaN(parseFloat(rawTolInput))) ? 2.0 : parseFloat(rawTolInput);
       showLoading(`Executing 2-Check Matching Engine (${selectedBranch})...`);
 
       setTimeout(() => {
@@ -1032,14 +1033,12 @@
         const cgstDiff = Math.round((bCgst - pCgst) * 100) / 100;
         const sgstDiff = Math.round((bSgst - pSgst) * 100) / 100;
 
-        const maxCount = Math.max(b.count, p.count);
-        const dynamicTol = Math.max(tolerance, Math.round(maxCount * 0.75 * 100) / 100);
+        const dynamicTol = (tolerance === 0) ? 0 : tolerance;
 
         let st = '';
         if (booksVendorAgg[g] && portalVendorAgg[g]) {
           const headsMatch = (Math.abs(igstDiff) <= dynamicTol && Math.abs(cgstDiff) <= dynamicTol && Math.abs(sgstDiff) <= dynamicTol);
           if (Math.abs(diff) <= tolerance && headsMatch) st = '100% Matched';
-          else if (Math.abs(diff) <= dynamicTol && headsMatch) st = '100% Matched (Round-off)';
           else if (Math.abs(diff) <= dynamicTol && !headsMatch) st = 'Tax Head Mismatch (IGST vs CGST/SGST)';
           else st = 'Tax Variance';
         } else if (booksVendorAgg[g]) {
@@ -1078,14 +1077,22 @@
       const booksByKey = {};
       booksRows.forEach((b, i) => {
         const cInv = cleanInvoiceNo(b.bill_no);
-        const key = cleanGstin(b.gstin) + '||' + cInv;
+        let key = cleanGstin(b.gstin) + '||' + cInv;
+        if (!cInv || cInv === '0') {
+          const docRef = b.sap_trans_no || b.trans_no || ('ROW_' + i);
+          key = cleanGstin(b.gstin) + '||DOC_' + docRef;
+        }
+
         if (!booksByKey[key]) {
           booksByKey[key] = {
-            gstin: cleanGstin(b.gstin),
-            bill_no: b.bill_no,
+            branch: b.branch || '',
+            sap_trans_no: b.sap_trans_no || b.trans_no || '',
+            inv_date: b.inv_date || '',
+            bill_no: b.bill_no || '',
             clean_bill: cInv,
-            inv_date: b.inv_date,
-            name: b.vendor_name,
+            vendor_name: b.vendor_name || '',
+            gstin: cleanGstin(b.gstin),
+            line_count: 0,
             taxable: 0,
             total_tax: 0,
             igst: 0,
@@ -1094,11 +1101,12 @@
             rows: []
           };
         }
-        booksByKey[key].taxable += safeFloat(b.taxable);
-        booksByKey[key].total_tax += safeFloat(b.total_tax);
-        booksByKey[key].igst += safeFloat(b.igst);
-        booksByKey[key].cgst += safeFloat(b.cgst);
-        booksByKey[key].sgst += safeFloat(b.sgst);
+        booksByKey[key].line_count++;
+        booksByKey[key].taxable = Math.round((booksByKey[key].taxable + safeFloat(b.taxable)) * 100) / 100;
+        booksByKey[key].total_tax = Math.round((booksByKey[key].total_tax + safeFloat(b.total_tax)) * 100) / 100;
+        booksByKey[key].igst = Math.round((booksByKey[key].igst + safeFloat(b.igst)) * 100) / 100;
+        booksByKey[key].cgst = Math.round((booksByKey[key].cgst + safeFloat(b.cgst)) * 100) / 100;
+        booksByKey[key].sgst = Math.round((booksByKey[key].sgst + safeFloat(b.sgst)) * 100) / 100;
         booksByKey[key].rows.push(i);
       });
 
@@ -1166,11 +1174,12 @@
             let isMatch = diag.match;
             let reason = diag.reason;
 
-            if (!isMatch && (!b.clean_bill || b.clean_bill === "0")) {
+            const isBlankBill = (!b.clean_bill || b.clean_bill === '0' || (b.clean_bill + '').indexOf('DOC_') === 0);
+            if (!isMatch && isBlankBill) {
               const sameTaxCount = cand.filter(pi => Math.abs(safeFloat(portalRows[pi].total_tax) - b.total_tax) <= tolerance).length;
               if (sameTaxCount === 1) {
                 isMatch = true;
-                reason = `Blank Bill No in Books: Unique bill for vendor ${b.name}`;
+                reason = `Blank Bill No in Books: Unique bill for vendor ${b.vendor_name || b.name}`;
               }
             }
 
@@ -1195,20 +1204,24 @@
       });
 
       // -------------------------------------------------------------
-      // BUILD DETAILED VIEWS (SIDE-BY-SIDE PRESENTATION)
+      // BUILD DETAILED VIEWS (SIDE-BY-SIDE PRESENTATION, 1 Row per Invoice)
       // -------------------------------------------------------------
       const booksVsPortal = [], actionableList = [];
-      booksRows.forEach(b => {
-        const key = cleanGstin(b.gstin) + '||' + cleanInvoiceNo(b.bill_no);
-        const bAgg = booksByKey[key] || b;
+      Object.keys(booksByKey).forEach(key => {
+        const b = booksByKey[key];
+        let transDisplay = b.sap_trans_no || '';
+        if (b.line_count > 1) {
+          transDisplay = (transDisplay ? transDisplay + ' ' : '') + '(' + b.line_count + ' items)';
+        }
 
         const row = {
           branch: b.branch || '',
-          sap_trans_no: b.sap_trans_no || '',
+          sap_trans_no: transDisplay,
           inv_date: b.inv_date || '',
           bill_no: b.bill_no || '',
           vendor_name: b.vendor_name || '',
-          gstin: cleanGstin(b.gstin),
+          gstin: b.gstin,
+          line_count: b.line_count,
           taxable: safeFloat(b.taxable),
           igst: safeFloat(b.igst),
           cgst: safeFloat(b.cgst),
@@ -1227,7 +1240,7 @@
           portal_tax: 0,
           tax_diff: safeFloat(b.total_tax),
           match_status: 'Only in Books (Missing in 2B)',
-          match_reason: 'Vendor has not filed invoice in GSTR-1 or GSTIN mismatch'
+          match_reason: 'Vendor has not filed invoice in GSTR-1 or GSTIN mismatch' + (b.line_count > 1 ? ' (' + b.line_count + ' items)' : '')
         };
 
         if (matchedBooksKeys[key]) {
@@ -1244,9 +1257,13 @@
           row.portal_sgst = safeFloat(p.sgst);
           row.sgst_diff = Math.round((safeFloat(b.sgst) - safeFloat(p.sgst)) * 100) / 100;
           row.portal_tax = safeFloat(p.total_tax);
-          row.tax_diff = Math.round((bAgg.total_tax - safeFloat(p.total_tax)) * 100) / 100;
+          row.tax_diff = Math.round((b.total_tax - safeFloat(p.total_tax)) * 100) / 100;
           row.match_status = m.status;
-          row.match_reason = m.reason;
+          if (b.line_count > 1) {
+            row.match_reason = m.reason + ' (Consolidated ' + b.line_count + ' line items in Books)';
+          } else {
+            row.match_reason = m.reason;
+          }
         }
         booksVsPortal.push(row);
 
