@@ -811,3 +811,208 @@ function exportToGoogleSheet(reconData) {
     sheetName: ss.getName()
   };
 }
+
+// -------------------------------------------------------------
+// DYNAMIC COLUMN AUTO-DETECTION ENGINE (SERVER-SIDE)
+// -------------------------------------------------------------
+
+var FIELD_DEFINITIONS = {
+  gstin: {
+    aliases: ['gstin/uin', 'supplier gstin', 'party gstin', 'vendor gstin', 'gstin', 'gst no', 'gst number', 'ctin', 'supplier gst', 'party gst', 'gst'],
+    exclusions: ['original', 'amended', 'rate', 'code', 'diff', 'variance', 'cgst', 'sgst', 'igst', 'type', 'amount', 'amt', 'value', 'val', 'summary', 'pivot', '%'],
+    multi: false,
+    weight: 5
+  },
+  bill_no: {
+    aliases: ['vendor bill no', 'bill no', 'vendor doc no', 'invoice no', 'inv no', 'bill number', 'invoice number', 'voucher no', 'vch no', 'doc no', 'document no', 'ref no', 'reference no', 'supplier inv no', 'supplier invoice'],
+    exclusions: ['original', 'amended', 'date', 'dt', 'rate', 'type', 'amount', 'amt', 'tax', 'total', 'value', 'val', 'diff', 'variance', 'code', '%'],
+    multi: false,
+    weight: 5
+  },
+  inv_date: {
+    aliases: ['invoice date', 'bill date', 'inv date', 'doc date', 'document date', 'vch date', 'voucher date', 'bill dt', 'inv dt', 'date'],
+    exclusions: ['original', 'amended', 'posting', 'entry', 'create', 'creation', 'due', 'r1', 'filing', 'reconcile'],
+    multi: false,
+    weight: 2
+  },
+  posting_date: {
+    aliases: ['posting date', 'post date', 'entry date', 'creation date', 'create date', 'clearing date'],
+    exclusions: ['original', 'invoice', 'inv', 'bill', 'doc date'],
+    multi: false,
+    weight: 1
+  },
+  vendor_name: {
+    aliases: ['vendor name', 'supplier name', 'party name', 'name of supplier', 'customer/vendor name', 'trade name', 'party', 'vendor', 'supplier'],
+    exclusions: ['original', 'code', 'id', 'gst', 'pan', 'state', 'city', 'address', 'branch', 'type'],
+    multi: false,
+    weight: 2
+  },
+  vendor_code: {
+    aliases: ['customer/vendor code', 'vendor code', 'supplier code', 'party code', 'vendor id', 'supplier id', 'account code'],
+    exclusions: ['original', 'name', 'gst', 'pan'],
+    multi: false,
+    weight: 1
+  },
+  taxable: {
+    aliases: ['taxable value', 'taxable amount', 'taxable val', 'item taxable value', 'taxable amt', 'assessable value', 'base amount', 'basic amount', 'net amount', 'taxable'],
+    exclusions: ['original', 'amended', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate', '%', 'code', 'total'],
+    multi: false,
+    weight: 4
+  },
+  cgst: {
+    aliases: ['cgst amount', 'cgst amt', 'cgst val', 'central tax', 'central gst', 'cgst'],
+    exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+    multi: true,
+    weight: 3
+  },
+  sgst: {
+    aliases: ['sgst amount', 'sgst amt', 'sgst val', 'state tax', 'state gst', 'sgst/utgst', 'utgst', 'sgst'],
+    exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+    multi: true,
+    weight: 3
+  },
+  igst: {
+    aliases: ['igst amount', 'igst amt', 'igst val', 'integrated tax', 'integrated gst', 'igst'],
+    exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'matched', 'rate'],
+    multi: true,
+    weight: 3
+  },
+  total_tax: {
+    aliases: ['total tax', 'tax amount', 'gst amount', 'total gst', 'tax amt', 'total tax amount', 'vat/tax amount'],
+    exclusions: ['original', 'amended', 'diff', 'variance', 'status', 'rate'],
+    multi: false,
+    weight: 2
+  },
+  total_val: {
+    aliases: ['total value', 'invoice value', 'total amount', 'inv value', 'grand total', 'gross total', 'bill amount', 'net total', 'doc value', 'total'],
+    exclusions: ['original', 'amended', 'tax', 'cgst', 'sgst', 'igst', 'diff', 'variance', 'rate'],
+    multi: false,
+    weight: 2
+  },
+  branch: {
+    aliases: ['branch name', 'branch', 'plant', 'location', 'unit', 'business unit', 'profit center'],
+    exclusions: ['code', 'id', 'sub'],
+    multi: false,
+    weight: 1
+  },
+  sap_trans_no: {
+    aliases: ['sap trans no', 'transaction number', 'trans no', 'trans #', 'voucher no', 'doc number', 'accounting doc', 'internal doc no'],
+    exclusions: ['original', 'date', 'type', 'vendor', 'rate'],
+    multi: false,
+    weight: 1
+  },
+  doc_type: {
+    aliases: ['document type', 'doc type', 'voucher type', 'vch type'],
+    exclusions: ['date', 'no', 'number'],
+    multi: false,
+    weight: 1
+  },
+  rcm: {
+    aliases: ['rcm applicable', 'reverse charge', 'rcm', 'rc'],
+    exclusions: ['diff'],
+    multi: false,
+    weight: 1
+  }
+};
+
+function detectSheetAndColumnsInSpreadsheet(ss, isBooks) {
+  var sheets = ss.getSheets();
+  var bestSheet = sheets[0];
+  var bestHeaderRow = 0;
+  var bestMapping = {};
+  var bestRawHeaders = [];
+  var bestScore = -1;
+  var preferredKws = isBooks ? ['input', 'purchase', 'pr', 'tally', 'register', 'raw'] : ['portal', '2b', 'gstr2b', 'gstr-2b', 'purchase', 'b2b'];
+
+  for (var s = 0; s < sheets.length; s++) {
+    var sheet = sheets[s];
+    var sheetName = sheet.getName();
+    var lastRow = Math.min(sheet.getLastRow(), 16);
+    if (lastRow < 1) continue;
+
+    var range = sheet.getRange(1, 1, lastRow, sheet.getLastColumn());
+    var values = range.getValues();
+
+    for (var r = 0; r < values.length; r++) {
+      var row = values[r];
+      var cleanCells = [];
+      var hasContent = false;
+      for (var c = 0; c < row.length; c++) {
+        var str = String(row[c] || '').trim().toLowerCase();
+        cleanCells.push(str);
+        if (str) hasContent = true;
+      }
+      if (!hasContent) continue;
+
+      var mapping = {};
+      var score = 0;
+
+      for (var field in FIELD_DEFINITIONS) {
+        var defn = FIELD_DEFINITIONS[field];
+        var found = [];
+
+        for (var a = 0; a < defn.aliases.length; a++) {
+          var alias = defn.aliases[a];
+          for (var colIdx = 0; colIdx < cleanCells.length; colIdx++) {
+            var cell = cleanCells[colIdx];
+            if (!cell) continue;
+
+            var excluded = false;
+            for (var ex = 0; ex < defn.exclusions.length; ex++) {
+              if (cell.indexOf(defn.exclusions[ex]) !== -1) {
+                excluded = true;
+                break;
+              }
+            }
+            if (excluded) continue;
+
+            var match = false;
+            if (alias === cell) match = true;
+            else if (alias.indexOf(' ') !== -1 && cell.indexOf(alias) !== -1) match = true;
+            else {
+              var reg = new RegExp('\\b' + alias + '\\b');
+              if (reg.test(cell)) match = true;
+            }
+
+            if (match && found.indexOf(colIdx) === -1) {
+              found.push(colIdx);
+              if (!defn.multi) break;
+            }
+          }
+          if (found.length > 0 && !defn.multi) break;
+        }
+
+        if (found.length > 0) {
+          mapping[field] = defn.multi ? found : found[0];
+          score += defn.weight;
+        }
+      }
+
+      var bonus = 0;
+      var sLower = sheetName.toLowerCase();
+      for (var k = 0; k < preferredKws.length; k++) {
+        if (sLower.indexOf(preferredKws[k]) !== -1) {
+          bonus += 5;
+          break;
+        }
+      }
+
+      var totalScore = score + bonus;
+      if (totalScore > bestScore) {
+        bestScore = totalScore;
+        bestSheet = sheet;
+        bestHeaderRow = r;
+        bestMapping = mapping;
+        bestRawHeaders = row;
+      }
+    }
+  }
+
+  return {
+    sheetName: bestSheet.getName(),
+    headerRow: bestHeaderRow,
+    mapping: bestMapping,
+    rawHeaders: bestRawHeaders,
+    score: bestScore
+  };
+}
